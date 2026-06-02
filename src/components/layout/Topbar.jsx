@@ -118,6 +118,19 @@ export default function Topbar({ onMenuClick }) {
     };
   }, []);
 
+  useEffect(() => {
+    const handleOutsidePointer = (event) => {
+      if (!notificationOpen) return;
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        closeNotifications();
+      }
+    };
+    document.addEventListener('pointerdown', handleOutsidePointer, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer, true);
+    };
+  }, [notificationOpen]);
+
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
       {/* Left */}

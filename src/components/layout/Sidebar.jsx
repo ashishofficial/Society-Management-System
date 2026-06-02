@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   Landmark,
   Vote,
-  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import societyConfig from '../../config/society';
@@ -63,7 +62,6 @@ const navSections = [
       { to: '/operations', label: 'Operations', icon: ShieldCheck, roles: ['admin', 'accountant'] },
       { to: '/finance-compliance', label: 'Finance Compliance', icon: Landmark, roles: ['admin', 'accountant'] },
       { to: '/governance', label: 'Governance', icon: Vote, roles: ['admin', 'accountant'] },
-      { to: '/product-settings', label: 'Product Settings', icon: Sparkles, roles: ['admin'] },
     ],
   },
 ];
