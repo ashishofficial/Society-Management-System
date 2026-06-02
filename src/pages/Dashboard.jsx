@@ -100,7 +100,7 @@ function CSSDonutChart({ data }) {
   if (total === 0) return <div className="h-[250px] flex items-center justify-center text-gray-400">No data</div>;
 
   let cumulative = 0;
-  const segments = data.map(d => {
+  const segments = [...data].sort((a, b) => b.value - a.value).map(d => {
     const start = cumulative;
     const percent = (d.value / total) * 100;
     cumulative += percent;
@@ -110,24 +110,31 @@ function CSSDonutChart({ data }) {
   const gradientParts = segments.map(s => `${s.color} ${s.start}% ${s.start + s.percent}%`).join(', ');
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="relative w-[200px] h-[200px]">
+    <div className="flex flex-col items-center gap-5">
+      <div className="relative w-[220px] h-[220px]">
         <div
-          className="w-full h-full rounded-full shadow-inner"
+          className="w-full h-full rounded-full shadow-inner border border-gray-100"
           style={{ background: `conic-gradient(${gradientParts})` }}
         />
-        <div className="absolute inset-[30%] bg-white rounded-full flex items-center justify-center shadow-sm">
+        <div className="absolute inset-[29%] bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100">
           <div className="text-center">
-            <p className="text-lg font-bold text-gray-800">{formatCurrency(total)}</p>
-            <p className="text-xs text-gray-400">Total</p>
+            <p className="text-xl font-bold text-gray-900 leading-tight">{formatCurrency(total)}</p>
+            <p className="text-xs text-gray-500">Total Spent</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">{segments.length} categories</p>
           </div>
         </div>
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center">
-        {data.map((d, i) => (
-          <div key={i} className="flex items-center gap-1.5 text-xs text-gray-600">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
-            {d.name}: {formatCurrency(d.value)}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-[520px]">
+        {segments.map((d, i) => (
+          <div key={i} className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/70 px-3 py-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+              <span className="text-xs text-gray-700 font-medium truncate">{d.name}</span>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-700 font-semibold">{formatCurrency(d.value)}</p>
+              <p className="text-[11px] text-gray-400">{Math.round(d.percent)}%</p>
+            </div>
           </div>
         ))}
       </div>
@@ -162,11 +169,13 @@ export default function Dashboard() {
     const monthExpenses = expenses.filter((e) => e.date.startsWith(currentMonth));
     const grouped = {};
     for (const e of monthExpenses) {
-      grouped[e.category] = (grouped[e.category] || 0) + e.amount;
+      const cat = getCategoryById(e.category);
+      const key = `${cat.label}__${cat.color}`;
+      grouped[key] = (grouped[key] || 0) + e.amount;
     }
-    return Object.entries(grouped).map(([catId, amount]) => {
-      const cat = getCategoryById(catId);
-      return { name: cat.label, value: amount, color: cat.color };
+    return Object.entries(grouped).map(([key, amount]) => {
+      const [name, color] = key.split('__');
+      return { name, value: amount, color };
     });
   }, [expenses, currentMonth]);
 

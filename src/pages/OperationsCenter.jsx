@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AlarmSmoke, CarFront, FileText, Package, Shield, Users } from 'lucide-react';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
 import { isValidFlatNumber } from '../utils/validation';
@@ -56,19 +57,56 @@ export default function OperationsCenter() {
     load();
   }, []);
 
+  const statCards = [
+    { label: 'Parking Slots', value: parking.length, icon: CarFront, tone: 'text-blue-700 bg-blue-50' },
+    { label: 'Staff Members', value: staff.length, icon: Users, tone: 'text-violet-700 bg-violet-50' },
+    { label: 'Open Parcels', value: parcels.filter((p) => p.status !== 'delivered').length, icon: Package, tone: 'text-amber-700 bg-amber-50' },
+    { label: 'Active Alerts', value: alerts.filter((a) => a.status !== 'closed').length, icon: AlarmSmoke, tone: 'text-red-700 bg-red-50' },
+  ];
+
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Operations & Security Center</h1>
-        <p className="text-sm text-gray-500 mt-1">Parking, staff, parcel desk, documents and emergency controls</p>
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-6 shadow-sm">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold">Operations & Security Center</h1>
+            <p className="text-sm text-slate-200 mt-1">
+              Manage security operations, daily workflows, documents and emergency response.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-xs">
+            <Shield className="w-4 h-4" />
+            Live operations panel
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <section className="bg-white rounded-xl border border-gray-100 p-4">
-          <h2 className="font-semibold text-gray-900 mb-3">Parking Management</h2>
-          {formError && <p className="text-sm text-red-600 mb-2">{formError}</p>}
-          <div className="flex gap-2 mb-3">
-            <input id="parking-slot-number" aria-label="Parking slot number" value={slotNumber} onChange={(e) => setSlotNumber(e.target.value)} placeholder="Slot number (P-101)" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {statCards.map(({ label, value, icon: Icon, tone }) => (
+          <div key={label} className="bg-white border border-gray-100 rounded-xl p-4">
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${tone}`}>
+              <Icon className="w-5 h-5" />
+            </div>
+            <p className="text-xs text-gray-500 mt-3">{label}</p>
+            <p className="text-2xl font-bold text-gray-900">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {formError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {formError}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <section className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <CarFront className="w-5 h-5 text-blue-600" />
+            <h2 className="font-semibold text-gray-900">Parking Management</h2>
+          </div>
+          <div className="flex gap-2 mb-4">
+            <input id="parking-slot-number" aria-label="Parking slot number" value={slotNumber} onChange={(e) => setSlotNumber(e.target.value)} placeholder="Slot number (P-101)" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             <button
               onClick={async () => {
                 if (!slotNumber.trim()) {
@@ -85,19 +123,35 @@ export default function OperationsCenter() {
                   showToast('error', err.message || 'Failed to add slot');
                 }
               }}
-              className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg"
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
             >
               Add
             </button>
           </div>
-          <ul className="text-sm text-gray-700 space-y-1 max-h-36 overflow-auto">{parking.map((item) => <li key={item._id}>{item.slotNumber} - {item.status}</li>)}</ul>
+          <ul className="space-y-2 max-h-56 overflow-auto pr-1">
+            {parking.map((item) => (
+              <li key={item._id} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-100 bg-gray-50/60">
+                <span className="text-sm font-medium text-gray-800">{item.slotNumber}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  item.status === 'occupied'
+                    ? 'bg-amber-100 text-amber-700'
+                    : item.status === 'reserved'
+                      ? 'bg-violet-100 text-violet-700'
+                      : 'bg-emerald-100 text-emerald-700'
+                }`}>{item.status}</span>
+              </li>
+            ))}
+          </ul>
         </section>
 
-        <section className="bg-white rounded-xl border border-gray-100 p-4">
-          <h2 className="font-semibold text-gray-900 mb-3">Staff & Attendance</h2>
-          <div className="flex gap-2 mb-3">
-            <input id="staff-name" aria-label="Staff name" value={staffForm.name} onChange={(e) => setStaffForm((p) => ({ ...p, name: e.target.value }))} placeholder="Staff name" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
-            <input id="staff-role" aria-label="Staff role" value={staffForm.role} onChange={(e) => setStaffForm((p) => ({ ...p, role: e.target.value }))} placeholder="Role" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
+        <section className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-violet-600" />
+            <h2 className="font-semibold text-gray-900">Staff & Attendance</h2>
+          </div>
+          <div className="flex gap-2 mb-4">
+            <input id="staff-name" aria-label="Staff name" value={staffForm.name} onChange={(e) => setStaffForm((p) => ({ ...p, name: e.target.value }))} placeholder="Staff name" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input id="staff-role" aria-label="Staff role" value={staffForm.role} onChange={(e) => setStaffForm((p) => ({ ...p, role: e.target.value }))} placeholder="Role" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             <button
               onClick={async () => {
                 if (!staffForm.name.trim() || !staffForm.role.trim()) {
@@ -114,35 +168,50 @@ export default function OperationsCenter() {
                   showToast('error', err.message || 'Failed to add staff');
                 }
               }}
-              className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg"
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
             >
               Add
             </button>
           </div>
-          <ul className="text-sm text-gray-700 space-y-1 max-h-36 overflow-auto">
+          <ul className="space-y-2 max-h-56 overflow-auto pr-1">
             {staff.map((item) => (
-              <li key={item._id} className="flex items-center justify-between">
-                <span>{item.name} ({item.role}) - {item.attendanceStatus}</span>
-                <button
-                  onClick={async () => {
-                    const next = item.attendanceStatus === 'present' ? 'absent' : 'present';
-                    await updateStaffAttendanceApi(item._id, { attendanceStatus: next });
-                    load();
-                  }}
-                  className="text-xs px-2 py-1 bg-gray-100 rounded"
-                >
-                  Toggle
-                </button>
+              <li key={item._id} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-100 bg-gray-50/60">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{item.name}</p>
+                  <p className="text-xs text-gray-500">{item.role}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    item.attendanceStatus === 'present'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : item.attendanceStatus === 'leave'
+                        ? 'bg-violet-100 text-violet-700'
+                        : 'bg-red-100 text-red-700'
+                  }`}>{item.attendanceStatus}</span>
+                  <button
+                    onClick={async () => {
+                      const next = item.attendanceStatus === 'present' ? 'absent' : 'present';
+                      await updateStaffAttendanceApi(item._id, { attendanceStatus: next });
+                      load();
+                    }}
+                    className="text-xs px-2 py-1 bg-white border border-gray-200 hover:bg-gray-100 rounded transition-colors"
+                  >
+                    Toggle
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         </section>
 
-        <section className="bg-white rounded-xl border border-gray-100 p-4">
-          <h2 className="font-semibold text-gray-900 mb-3">Parcel Desk</h2>
-          <div className="flex gap-2 mb-3">
-            <input id="parcel-flat" aria-label="Parcel flat number" value={parcelForm.flat} onChange={(e) => setParcelForm((p) => ({ ...p, flat: e.target.value }))} placeholder="Flat" className="w-28 px-3 py-2 border rounded-lg text-sm" />
-            <input id="parcel-recipient" aria-label="Parcel recipient name" value={parcelForm.recipientName} onChange={(e) => setParcelForm((p) => ({ ...p, recipientName: e.target.value }))} placeholder="Recipient name" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
+        <section className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Package className="w-5 h-5 text-amber-600" />
+            <h2 className="font-semibold text-gray-900">Parcel Desk</h2>
+          </div>
+          <div className="flex gap-2 mb-4">
+            <input id="parcel-flat" aria-label="Parcel flat number" value={parcelForm.flat} onChange={(e) => setParcelForm((p) => ({ ...p, flat: e.target.value }))} placeholder="Flat" className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input id="parcel-recipient" aria-label="Parcel recipient name" value={parcelForm.recipientName} onChange={(e) => setParcelForm((p) => ({ ...p, recipientName: e.target.value }))} placeholder="Recipient name" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             <button
               onClick={async () => {
                 if (!isValidFlatNumber(parcelForm.flat) || !parcelForm.recipientName.trim()) {
@@ -158,31 +227,40 @@ export default function OperationsCenter() {
                   showToast('error', err.message || 'Failed to add parcel');
                 }
               }}
-              className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg"
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
             >
               Add
             </button>
           </div>
-          <ul className="text-sm text-gray-700 space-y-1 max-h-36 overflow-auto">
+          <ul className="space-y-2 max-h-56 overflow-auto pr-1">
             {parcels.map((item) => (
-              <li key={item._id} className="flex items-center justify-between">
-                <span>{item.flat} - {item.recipientName} ({item.status})</span>
+              <li key={item._id} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-100 bg-gray-50/60">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{item.flat} - {item.recipientName}</p>
+                  <p className="text-xs text-gray-500">{item.status}</p>
+                </div>
                 {item.status !== 'delivered' && (
-                  <button onClick={async () => { await markParcelDeliveredApi(item._id); load(); }} className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded">
+                  <button onClick={async () => { await markParcelDeliveredApi(item._id); load(); }} className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200 transition-colors">
                     Delivered
                   </button>
+                )}
+                {item.status === 'delivered' && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">Delivered</span>
                 )}
               </li>
             ))}
           </ul>
         </section>
 
-        <section className="bg-white rounded-xl border border-gray-100 p-4">
-          <h2 className="font-semibold text-gray-900 mb-3">Document Vault</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-            <input id="doc-title" aria-label="Document title" value={docForm.title} onChange={(e) => setDocForm((p) => ({ ...p, title: e.target.value }))} placeholder="Title" className="px-3 py-2 border rounded-lg text-sm" />
-            <input id="doc-category" aria-label="Document category" value={docForm.category} onChange={(e) => setDocForm((p) => ({ ...p, category: e.target.value }))} placeholder="Category" className="px-3 py-2 border rounded-lg text-sm" />
-            <input id="doc-url" aria-label="Document URL" value={docForm.url} onChange={(e) => setDocForm((p) => ({ ...p, url: e.target.value }))} placeholder="https://..." className="px-3 py-2 border rounded-lg text-sm" />
+        <section className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="w-5 h-5 text-slate-700" />
+            <h2 className="font-semibold text-gray-900">Document Vault</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+            <input id="doc-title" aria-label="Document title" value={docForm.title} onChange={(e) => setDocForm((p) => ({ ...p, title: e.target.value }))} placeholder="Title" className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input id="doc-category" aria-label="Document category" value={docForm.category} onChange={(e) => setDocForm((p) => ({ ...p, category: e.target.value }))} placeholder="Category" className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input id="doc-url" aria-label="Document URL" value={docForm.url} onChange={(e) => setDocForm((p) => ({ ...p, url: e.target.value }))} placeholder="https://..." className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <button
             onClick={async () => {
@@ -199,23 +277,33 @@ export default function OperationsCenter() {
                 showToast('error', err.message || 'Failed to add document');
               }
             }}
-            className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg mb-3"
+            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors mb-3"
           >
             Save Document
           </button>
-          <ul className="text-sm text-gray-700 space-y-1 max-h-36 overflow-auto">{docs.map((item) => <li key={item._id}>{item.title} - {item.category}</li>)}</ul>
+          <ul className="space-y-2 max-h-52 overflow-auto pr-1">
+            {docs.map((item) => (
+              <li key={item._id} className="px-3 py-2 rounded-lg border border-gray-100 bg-gray-50/60">
+                <p className="text-sm font-medium text-gray-800">{item.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{item.category}</p>
+              </li>
+            ))}
+          </ul>
         </section>
       </div>
 
-      <section className="bg-white rounded-xl border border-gray-100 p-4">
-        <h2 className="font-semibold text-gray-900 mb-3">Emergency Alerts</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-3">
-          <input id="alert-flat" aria-label="Alert flat number" value={alertForm.flat} onChange={(e) => setAlertForm((p) => ({ ...p, flat: e.target.value }))} placeholder="Flat" className="px-3 py-2 border rounded-lg text-sm" />
-          <input id="alert-raised-by" aria-label="Alert raised by" value={alertForm.raisedBy} onChange={(e) => setAlertForm((p) => ({ ...p, raisedBy: e.target.value }))} placeholder="Raised by" className="px-3 py-2 border rounded-lg text-sm" />
-          <select id="alert-type" aria-label="Alert type" value={alertForm.type} onChange={(e) => setAlertForm((p) => ({ ...p, type: e.target.value }))} className="px-3 py-2 border rounded-lg text-sm">
+      <section className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <AlarmSmoke className="w-5 h-5 text-red-600" />
+          <h2 className="font-semibold text-gray-900">Emergency Alerts</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-4">
+          <input id="alert-flat" aria-label="Alert flat number" value={alertForm.flat} onChange={(e) => setAlertForm((p) => ({ ...p, flat: e.target.value }))} placeholder="Flat" className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+          <input id="alert-raised-by" aria-label="Alert raised by" value={alertForm.raisedBy} onChange={(e) => setAlertForm((p) => ({ ...p, raisedBy: e.target.value }))} placeholder="Raised by" className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+          <select id="alert-type" aria-label="Alert type" value={alertForm.type} onChange={(e) => setAlertForm((p) => ({ ...p, type: e.target.value }))} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
             <option value="medical">Medical</option><option value="fire">Fire</option><option value="security">Security</option><option value="other">Other</option>
           </select>
-          <input id="alert-notes" aria-label="Alert notes" value={alertForm.notes} onChange={(e) => setAlertForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Notes" className="px-3 py-2 border rounded-lg text-sm sm:col-span-2" />
+          <input id="alert-notes" aria-label="Alert notes" value={alertForm.notes} onChange={(e) => setAlertForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Notes" className="px-3 py-2 border border-gray-300 rounded-lg text-sm sm:col-span-2 focus:outline-none focus:ring-2 focus:ring-red-400" />
         </div>
         <button
           onClick={async () => {
@@ -232,16 +320,30 @@ export default function OperationsCenter() {
               showToast('error', err.message || 'Failed to raise alert');
             }
           }}
-          className="px-3 py-2 bg-red-600 text-white text-sm rounded-lg mb-3"
+          className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition-colors mb-3"
         >
           Raise Alert
         </button>
-        <ul className="text-sm text-gray-700 space-y-1">{alerts.map((item) => (
-          <li key={item._id} className="flex justify-between">
-            <span>{item.flat} - {item.type} - {item.status}</span>
-            {item.status !== 'closed' && <button className="text-xs px-2 py-1 bg-yellow-100 rounded" onClick={async () => { await updateEmergencyStatusApi(item._id, { status: 'acknowledged' }); load(); }}>Acknowledge</button>}
-          </li>
-        ))}</ul>
+        <ul className="space-y-2 max-h-64 overflow-auto pr-1">
+          {alerts.map((item) => (
+            <li key={item._id} className="flex justify-between items-center px-3 py-2 rounded-lg border border-gray-100 bg-gray-50/70">
+              <div>
+                <p className="text-sm font-medium text-gray-800">{item.flat} - {item.type}</p>
+                <p className="text-xs text-gray-500">{item.raisedBy || 'Unknown'} • {item.status}</p>
+              </div>
+              {item.status !== 'closed' ? (
+                <button
+                  className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200 transition-colors"
+                  onClick={async () => { await updateEmergencyStatusApi(item._id, { status: 'acknowledged' }); load(); }}
+                >
+                  Acknowledge
+                </button>
+              ) : (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">Closed</span>
+              )}
+            </li>
+          ))}
+        </ul>
       </section>
 
       <Toast toast={toast} onClose={clearToast} />

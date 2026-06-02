@@ -177,7 +177,7 @@ export async function streamNotifications(req, res) {
     await send();
     const interval = setInterval(() => {
       send().catch(() => {});
-    }, 2000);
+    }, 500);
     const heartbeat = setInterval(() => {
       res.write(`event: ping\ndata: {}\n\n`);
     }, 25000);

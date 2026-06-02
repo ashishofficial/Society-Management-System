@@ -4,6 +4,15 @@ import { Expense } from '../expenses/expense.model.js';
 import { Payment } from '../payments/payment.model.js';
 import { BudgetPlan, ReconciliationEntry } from './finance.model.js';
 
+function getFinancialYearMonths(financialYear) {
+  const startYear = Number((financialYear || '').split('-')[0]);
+  if (Number.isNaN(startYear)) return null;
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(startYear, 3 + i, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+}
+
 export const createBudget = asyncHandler(async (req, res) => {
   const { financialYear, category, budgetedAmount } = req.body;
   if (!financialYear || !category || typeof budgetedAmount !== 'number') {
@@ -69,7 +78,16 @@ export const createReconciliationEntry = asyncHandler(async (req, res) => {
 });
 
 export const listReconciliationEntries = asyncHandler(async (req, res) => {
-  const data = await ReconciliationEntry.find({ societyId: req.societyId }).sort({ date: -1, createdAt: -1 });
+  const financialYear = req.query.financialYear;
+  const filter = { societyId: req.societyId };
+
+  if (financialYear) {
+    const months = getFinancialYearMonths(financialYear);
+    if (!months) throw new ApiError(400, 'Invalid financialYear format');
+    filter.date = { $regex: `^(${months.join('|')})` };
+  }
+
+  const data = await ReconciliationEntry.find(filter).sort({ date: -1, createdAt: -1 });
   res.json({ data });
 });
 
@@ -95,14 +113,31 @@ export const autoMatchReconciliation = asyncHandler(async (req, res) => {
 });
 
 export const getComplianceSummary = asyncHandler(async (req, res) => {
-  const month = req.query.month || new Date().toISOString().slice(0, 7);
-  const payments = await Payment.find({ societyId: req.societyId, month });
+  const { month, financialYear } = req.query;
+  const filter = { societyId: req.societyId };
+  let summaryLabel = '';
+
+  if (month) {
+    filter.month = month;
+    summaryLabel = month;
+  } else if (financialYear) {
+    const months = getFinancialYearMonths(financialYear);
+    if (!months) throw new ApiError(400, 'Invalid financialYear format');
+    filter.month = { $in: months };
+    summaryLabel = financialYear;
+  } else {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    filter.month = currentMonth;
+    summaryLabel = currentMonth;
+  }
+
+  const payments = await Payment.find(filter);
   const overdueCount = payments.filter((p) => p.status === 'overdue' || p.status === 'unpaid').length;
   const totalDue = payments.reduce((sum, p) => sum + (p.totalDue || 0), 0);
   const totalCollected = payments.reduce((sum, p) => sum + (p.paidAmount || 0), 0);
   res.json({
     data: {
-      month,
+      month: summaryLabel,
       overdueCount,
       totalDue,
       totalCollected,

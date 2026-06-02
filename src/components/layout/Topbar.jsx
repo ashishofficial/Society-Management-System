@@ -53,22 +53,31 @@ export default function Topbar({ onMenuClick }) {
 
   const groupedItems = useMemo(() => notificationData.items.slice(0, 8), [notificationData.items]);
 
-  const loadNotifications = async () => {
+  const openNotifications = () => {
+    setNotificationOpen(true);
+    loadNotifications({ withLoading: false });
+  };
+
+  const closeNotifications = () => {
+    setNotificationOpen(false);
+  };
+
+  const loadNotifications = async ({ withLoading = true } = {}) => {
     if (!localStorage.getItem('auth_token')) return;
-    setNotificationLoading(true);
+    if (withLoading) setNotificationLoading(true);
     try {
       const data = await listNotificationsApi();
       setNotificationData(data);
     } catch {
       setNotificationData({ unreadCount: 0, items: [] });
     } finally {
-      setNotificationLoading(false);
+      if (withLoading) setNotificationLoading(false);
     }
   };
 
   useEffect(() => {
-    loadNotifications();
-    const interval = window.setInterval(loadNotifications, 30000);
+    loadNotifications({ withLoading: true });
+    const interval = window.setInterval(() => loadNotifications({ withLoading: false }), 4000);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -100,24 +109,14 @@ export default function Topbar({ onMenuClick }) {
   }, [location.pathname]);
 
   useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (!notificationOpen) return;
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
-        setNotificationOpen(false);
-      }
-    };
-
     const handleEsc = (event) => {
       if (event.key === 'Escape') setNotificationOpen(false);
     };
-
-    document.addEventListener('mousedown', handleOutsideClick);
     document.addEventListener('keydown', handleEsc);
     return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('keydown', handleEsc);
     };
-  }, [notificationOpen]);
+  }, []);
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
@@ -140,11 +139,19 @@ export default function Topbar({ onMenuClick }) {
         <span className="hidden md:block text-sm text-gray-500">{today}</span>
 
         {/* Notification bell */}
-        <div className="relative" ref={notificationRef}>
+        <div className="relative z-50" ref={notificationRef}>
         <button
+          type="button"
           className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
           aria-label="View notifications"
-          onClick={() => setNotificationOpen((prev) => !prev)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (notificationOpen) {
+              closeNotifications();
+            } else {
+              openNotifications();
+            }
+          }}
         >
           <Bell className="w-5 h-5" />
           {hasUnread && (
@@ -154,19 +161,38 @@ export default function Topbar({ onMenuClick }) {
           )}
         </button>
         {notificationOpen && (
-          <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50">
+          <>
+            <button
+              type="button"
+              className="fixed inset-0 bg-black/25 z-40 md:hidden"
+              aria-label="Close notifications"
+              onClick={closeNotifications}
+            />
+            <div
+              className="fixed top-16 left-3 right-3 max-h-[75vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden md:absolute md:top-auto md:left-auto md:right-0 md:mt-2 md:w-80 md:max-h-none"
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <p className="text-sm font-semibold text-gray-900">Notifications</p>
-              <button
-                className="text-xs text-blue-600 hover:text-blue-700 disabled:opacity-40"
-                disabled={!hasUnread}
-                onClick={async () => {
-                  await markAllNotificationsReadApi();
-                  await loadNotifications();
-                }}
-              >
-                Mark all read
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  className="text-xs text-blue-600 hover:text-blue-700 disabled:opacity-40"
+                  disabled={!hasUnread}
+                  onClick={async () => {
+                    await markAllNotificationsReadApi();
+                    await loadNotifications();
+                  }}
+                >
+                  Mark all read
+                </button>
+                <button
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                  onClick={closeNotifications}
+                  aria-label="Close notifications panel"
+                >
+                  Close
+                </button>
+              </div>
             </div>
             <div className="max-h-96 overflow-auto">
               {notificationLoading ? (
@@ -190,7 +216,7 @@ export default function Topbar({ onMenuClick }) {
                           // noop
                         }
                       }
-                      setNotificationOpen(false);
+                      closeNotifications();
                       if (item.href) navigate(item.href);
                     }}
                     className={`w-full text-left px-4 py-3 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors ${
@@ -206,7 +232,8 @@ export default function Topbar({ onMenuClick }) {
                 ))
               )}
             </div>
-          </div>
+            </div>
+          </>
         )}
         </div>
 
