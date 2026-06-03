@@ -35,8 +35,6 @@ export const env = {
   // Optional regex (string) to also allow dynamic origins like Vercel preview URLs,
   // e.g. CORS_ORIGIN_REGEX="^https://society-management-system-.*\\.vercel\\.app$"
   corsOriginRegex: process.env.CORS_ORIGIN_REGEX || '',
-  // Auto-insert dummy data on first boot if the DB is empty. Set AUTO_SEED=false to disable.
-  autoSeed: process.env.AUTO_SEED !== 'false',
   maintenanceDueDay: Number(process.env.MAINTENANCE_DUE_DAY || 10),
   lateFeePerDay: Number(process.env.LATE_FEE_PER_DAY || 50),
   paymentGatewayBaseUrl: process.env.PAYMENT_GATEWAY_BASE_URL || 'https://payments.clave.local/pay',

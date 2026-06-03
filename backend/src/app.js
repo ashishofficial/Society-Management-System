@@ -24,7 +24,6 @@ import portalRoutes from './modules/portal/portal.routes.js';
 import reportRoutes from './modules/reports/report.routes.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { connectDb } from './config/db.js';
-import { seedIfEmpty } from './scripts/seedData.js';
 import { attachSocietyContext } from './middlewares/society.js';
 import { auditLogger } from './middlewares/auditLogger.js';
 import { sanitizeMongo } from './middlewares/sanitize.js';
@@ -36,29 +35,10 @@ let dbConnectPromise = null;
 function ensureDatabase() {
   if (mongoose.connection.readyState === 1) return Promise.resolve();
   if (!dbConnectPromise) {
-    dbConnectPromise = connectDb()
-      .then(async () => {
-        // Populate dummy data once if the database is empty (no manual seed command needed).
-        if (env.autoSeed) {
-          try {
-            const result = await seedIfEmpty();
-            if (result.seeded) {
-              console.log('Auto-seeded dummy data into empty database.');
-              if (result.generatedCreds?.length) {
-                console.log('=== GENERATED LOGIN PASSWORDS (shown once — save & change them) ===');
-                for (const c of result.generatedCreds) console.log(`  ${c.label}  ->  ${c.password}`);
-                console.log('===================================================================');
-              }
-            }
-          } catch (seedErr) {
-            console.error('Auto-seed failed (continuing without it):', seedErr.message);
-          }
-        }
-      })
-      .catch((err) => {
-        dbConnectPromise = null;
-        throw err;
-      });
+    dbConnectPromise = connectDb().catch((err) => {
+      dbConnectPromise = null;
+      throw err;
+    });
   }
   return dbConnectPromise;
 }
