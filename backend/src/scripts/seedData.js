@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { User } from '../modules/users/user.model.js';
 import { Member } from '../modules/members/member.model.js';
 import { Payment } from '../modules/payments/payment.model.js';
@@ -15,13 +16,24 @@ import { SocietySetting, BackupRecord, DeviceToken } from '../modules/product/pr
 
 const SOCIETY_ID = process.env.SEED_SOCIETY_ID || 'default';
 const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@clave.demo';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@123';
 const ACCOUNTANT_EMAIL = process.env.ACCOUNTANT_EMAIL || 'accountant@clave.demo';
-const ACCOUNTANT_PASSWORD = process.env.ACCOUNTANT_PASSWORD || 'Account@123';
 const MEMBER_EMAIL = process.env.MEMBER_EMAIL || 'member@clave.demo';
-const MEMBER_PASSWORD = process.env.MEMBER_PASSWORD || 'Member@123';
+
+// Resolve a seed password: prefer the env var; in production NEVER fall back to a guessable
+// default — generate a strong random one and record it so it can be printed to the logs once.
+function resolvePassword(envVar, devDefault, label, generated) {
+  const fromEnv = process.env[envVar];
+  if (fromEnv) return fromEnv;
+  if (IS_PROD) {
+    const pw = randomBytes(12).toString('base64url'); // ~16 chars, high entropy
+    generated.push({ label, password: pw });
+    return pw;
+  }
+  return devDefault;
+}
 
 /**
  * Inserts a full set of demo data for a society. Does NOT clear existing data.
@@ -29,10 +41,15 @@ const MEMBER_PASSWORD = process.env.MEMBER_PASSWORD || 'Member@123';
  */
 export async function insertDummyData(societyId = SOCIETY_ID) {
   const month = CURRENT_MONTH;
+  const generatedCreds = [];
+  const adminPassword = resolvePassword('ADMIN_PASSWORD', 'Admin@123', `admin (${ADMIN_EMAIL})`, generatedCreds);
+  const accountantPassword = resolvePassword('ACCOUNTANT_PASSWORD', 'Account@123', `accountant (${ACCOUNTANT_EMAIL})`, generatedCreds);
+  const memberPassword = resolvePassword('MEMBER_PASSWORD', 'Member@123', `member (${MEMBER_EMAIL})`, generatedCreds);
+
   const [passwordHash, accountantHash, memberHash] = await Promise.all([
-    bcrypt.hash(ADMIN_PASSWORD, 10),
-    bcrypt.hash(ACCOUNTANT_PASSWORD, 10),
-    bcrypt.hash(MEMBER_PASSWORD, 10),
+    bcrypt.hash(adminPassword, 10),
+    bcrypt.hash(accountantPassword, 10),
+    bcrypt.hash(memberPassword, 10),
   ]);
 
   const [adminUser, accountantUser, memberUser] = await User.insertMany([
@@ -167,6 +184,8 @@ export async function insertDummyData(societyId = SOCIETY_ID) {
       { email: ACCOUNTANT_EMAIL, role: 'accountant' },
       { email: MEMBER_EMAIL, role: 'member' },
     ],
+    // Passwords that had to be auto-generated (no env var set) — caller logs these once.
+    generatedCreds,
   };
 }
 

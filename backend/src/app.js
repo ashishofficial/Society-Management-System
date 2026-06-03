@@ -42,7 +42,14 @@ function ensureDatabase() {
         if (env.autoSeed) {
           try {
             const result = await seedIfEmpty();
-            if (result.seeded) console.log('Auto-seeded dummy data into empty database.');
+            if (result.seeded) {
+              console.log('Auto-seeded dummy data into empty database.');
+              if (result.generatedCreds?.length) {
+                console.log('=== GENERATED LOGIN PASSWORDS (shown once — save & change them) ===');
+                for (const c of result.generatedCreds) console.log(`  ${c.label}  ->  ${c.password}`);
+                console.log('===================================================================');
+              }
+            }
           } catch (seedErr) {
             console.error('Auto-seed failed (continuing without it):', seedErr.message);
           }
