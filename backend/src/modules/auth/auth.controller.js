@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../users/user.model.js';
+import { Member } from '../members/member.model.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { env } from '../../config/env.js';
@@ -69,6 +70,17 @@ export const login = asyncHandler(async (req, res) => {
 
   const match = await bcrypt.compare(password, user.passwordHash);
   if (!match) throw new ApiError(401, 'Invalid credentials');
+
+  // Auto-link a resident login to their flat: if a member account isn't linked yet but a member
+  // record exists with the same email, connect them so the resident portal works.
+  if (user.role === 'member' && !user.flatNumber) {
+    const member = await Member.findOne({ societyId: user.societyId, email: user.email });
+    if (member) {
+      user.memberId = member._id;
+      user.flatNumber = member.flatNumber;
+      await user.save();
+    }
+  }
 
   const token = signToken(user);
   res.json({ token, user: publicUser(user) });

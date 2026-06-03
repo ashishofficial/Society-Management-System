@@ -1,5 +1,6 @@
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ApiError } from '../../utils/ApiError.js';
+import { User } from '../users/user.model.js';
 import { Member } from '../members/member.model.js';
 import { Payment } from '../payments/payment.model.js';
 import { Complaint } from '../complaints/complaint.model.js';
@@ -8,11 +9,23 @@ import { Notice } from '../notices/notice.model.js';
 // Resolve the resident record for the logged-in member account. Every portal endpoint is scoped
 // to this flat, so a member can only ever see/create data for their own unit.
 async function resolveMyFlat(req) {
-  const flatNumber = req.user.flatNumber;
+  let flatNumber = req.user.flatNumber;
+  let member = null;
+
+  // Fallback auto-link (covers existing sessions): if this resident login isn't linked yet but a
+  // member record shares its email, link them on the fly so the portal works without re-login.
+  if (!flatNumber) {
+    member = await Member.findOne({ societyId: req.societyId, email: req.user.email });
+    if (member) {
+      flatNumber = member.flatNumber;
+      await User.updateOne({ _id: req.user.id }, { memberId: member._id, flatNumber });
+    }
+  }
+
   if (!flatNumber) {
     throw new ApiError(403, 'Your account is not linked to a flat. Contact the society admin.');
   }
-  const member = await Member.findOne({ societyId: req.societyId, flatNumber });
+  if (!member) member = await Member.findOne({ societyId: req.societyId, flatNumber });
   return { flatNumber, member };
 }
 
