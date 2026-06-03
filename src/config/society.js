@@ -1,14 +1,3 @@
-const adminEmail =
-  import.meta.env.VITE_ADMIN_EMAIL ||
-  import.meta.env.VITE_ADMIN_USERNAME ||
-  '';
-const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || '';
-const memberEmail =
-  import.meta.env.VITE_MEMBER_EMAIL ||
-  import.meta.env.VITE_MEMBER_USERNAME ||
-  '';
-const memberPassword = import.meta.env.VITE_MEMBER_PASSWORD || '';
-
 const societyConfig = {
   name: "Green Valley Residency",
   shortName: "GVR",
@@ -44,11 +33,6 @@ const societyConfig = {
   productTagline: "Smart Society Management",
   companyName: "CodingClave",
   companyUrl: "https://codingclave.com/products/society-management-software",
-
-  demoCredentials: {
-    admin: { username: adminEmail, password: adminPassword, role: "admin", name: "RWA Admin" },
-    member: { username: memberEmail, password: memberPassword, role: "member", name: "Resident User" },
-  },
 
   financialYearStart: 4,
 

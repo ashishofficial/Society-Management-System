@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import societyConfig from '../config/society';
 import { isLiveMode } from '../config/appMode';
 import { getCurrentUser, loginWithApi, clearAuthToken } from '../services/authService';
 
@@ -47,24 +46,20 @@ export function AuthProvider({ children }) {
       return { success: false, error: 'Invalid email or password' };
     }
 
-    const creds = societyConfig.demoCredentials;
-    for (const key of Object.keys(creds)) {
-      const configuredUsername = creds[key].username;
-      const configuredPassword = creds[key].password;
-
-      // Ignore credential entries that are not configured in environment variables.
-      if (!configuredUsername || !configuredPassword) continue;
-
-      if (configuredUsername === username && configuredPassword === password) {
-        const userData = { username, role: creds[key].role, name: creds[key].name };
-        // Demo residents aren't linked to a flat server-side; pin one so flat-scoped demo
-        // features (My Flat, governance voting/RSVP) work without a backend.
-        if (creds[key].role === 'member') userData.flatNumber = 'A-101';
-        setUser(userData);
-        return { success: true };
-      }
+    // Demo sandbox only (no backend). Fixed, clearly-fake logins that unlock the local demo
+    // dataset — these are NOT real accounts and do not work against the live API.
+    const DEMO_USERS = {
+      'demo-admin': { password: 'demo', role: 'admin', name: 'Demo Admin' },
+      'demo-member': { password: 'demo', role: 'member', name: 'Demo Member', flatNumber: 'A-101' },
+    };
+    const match = DEMO_USERS[(username || '').toLowerCase().trim()];
+    if (match && password === match.password) {
+      const userData = { username, role: match.role, name: match.name };
+      if (match.flatNumber) userData.flatNumber = match.flatNumber;
+      setUser(userData);
+      return { success: true };
     }
-    return { success: false, error: 'Invalid username or password' };
+    return { success: false, error: 'Invalid demo credentials' };
   };
 
   const logout = () => {
