@@ -44,7 +44,23 @@ function ensureDatabase() {
 }
 
 app.use(helmet());
-app.use(cors({ origin: env.corsOrigin }));
+
+// Allow the configured origin allowlist (CORS_ORIGIN) plus an optional preview-URL regex.
+// Requests with no Origin header (curl, health checks, same-origin) are allowed through.
+const previewOriginRe = env.corsOriginRegex ? new RegExp(env.corsOriginRegex) : null;
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (env.corsOrigins.includes(origin)) return true;
+  if (previewOriginRe && previewOriginRe.test(origin)) return true;
+  return false;
+}
+app.use(cors({
+  origin(origin, callback) {
+    callback(null, isAllowedOrigin(origin));
+  },
+  credentials: false,
+}));
+
 app.use(express.json({ limit: '100kb' }));
 app.use(sanitizeMongo);
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));

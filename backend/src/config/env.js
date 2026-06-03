@@ -18,13 +18,23 @@ if (process.env.NODE_ENV === 'production') {
   }
 }
 
+// CORS_ORIGIN may be a single origin or a comma-separated allowlist, e.g.
+// "https://my-app.vercel.app,http://localhost:5173". Each entry is matched exactly.
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 5000),
   mongodbUri: process.env.MONGODB_URI,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  corsOrigins,
+  // Optional regex (string) to also allow dynamic origins like Vercel preview URLs,
+  // e.g. CORS_ORIGIN_REGEX="^https://society-management-system-.*\\.vercel\\.app$"
+  corsOriginRegex: process.env.CORS_ORIGIN_REGEX || '',
   maintenanceDueDay: Number(process.env.MAINTENANCE_DUE_DAY || 10),
   lateFeePerDay: Number(process.env.LATE_FEE_PER_DAY || 50),
   paymentGatewayBaseUrl: process.env.PAYMENT_GATEWAY_BASE_URL || 'https://payments.clave.local/pay',
