@@ -3,7 +3,9 @@ import { useData } from '../context/DataContext';
 import Modal from '../components/common/Modal';
 import DataState from '../components/common/DataState';
 import { isValidEmail, isValidFlatNumber, isValidPhone } from '../utils/validation';
-import { Plus, Search, Users, Phone, Mail, Grid, List, Home } from 'lucide-react';
+import { isLiveMode } from '../config/appMode';
+import { createMemberLoginApi } from '../services/memberService';
+import { Plus, Search, Users, Phone, Mail, Grid, List, Home, KeyRound } from 'lucide-react';
 
 const emptyForm = {
   flatNumber: '',
@@ -24,6 +26,42 @@ export default function Members() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
+  const [loginTarget, setLoginTarget] = useState(null);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginSuccess, setLoginSuccess] = useState('');
+  const [loginBusy, setLoginBusy] = useState(false);
+
+  const openLoginModal = (m) => {
+    setLoginTarget(m);
+    setLoginPassword('');
+    setLoginSuccess('');
+    setLoginError(m.email ? '' : 'This resident has no email. Add one to their record first.');
+  };
+
+  const handleCreateLogin = async (e) => {
+    e.preventDefault();
+    if (!loginTarget) return;
+    if (!isLiveMode) {
+      setLoginError('Login creation is only available in live (backend) mode.');
+      return;
+    }
+    if (!loginPassword || loginPassword.length < 8) {
+      setLoginError('Password must be at least 8 characters');
+      return;
+    }
+    setLoginBusy(true);
+    setLoginError('');
+    try {
+      await createMemberLoginApi(loginTarget.id, loginPassword);
+      setLoginSuccess(`Login created for ${loginTarget.email}`);
+      setLoginPassword('');
+    } catch (err) {
+      setLoginError(err?.message || 'Failed to create login');
+    } finally {
+      setLoginBusy(false);
+    }
+  };
 
   const filtered = members.filter((m) => {
     const matchSearch =
@@ -156,6 +194,7 @@ export default function Members() {
                   <th className="px-4 py-3">Family Size</th>
                   <th className="px-4 py-3">Role</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Login</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -203,6 +242,14 @@ export default function Members() {
                       >
                         {m.status === 'active' ? 'Active' : 'Inactive'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => openLoginModal(m)}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" /> Create login
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -272,6 +319,12 @@ export default function Members() {
                   <span>{m.familyMembers} family members</span>
                 </div>
               </div>
+              <button
+                onClick={() => openLoginModal(m)}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800"
+              >
+                <KeyRound className="w-3.5 h-3.5" /> Create login
+              </button>
             </div>
           ))}
           {filtered.length === 0 && (
@@ -450,6 +503,62 @@ export default function Members() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Create login for an existing member */}
+      <Modal isOpen={!!loginTarget} onClose={() => setLoginTarget(null)} title="Create Resident Login" size="sm">
+        {loginSuccess ? (
+          <div className="space-y-4">
+            <p className="text-sm text-green-700 font-medium">{loginSuccess}</p>
+            <p className="text-xs text-gray-500">
+              They can now sign in with their email and the password you set.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setLoginTarget(null)}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleCreateLogin} className="space-y-4">
+            {loginError && <p className="text-sm text-red-600">{loginError}</p>}
+            <div className="text-sm text-gray-600 space-y-0.5">
+              <p>Flat: <span className="font-medium text-gray-900">{loginTarget?.flatNumber}</span></p>
+              <p>Email: <span className="font-medium text-gray-900">{loginTarget?.email || '—'}</span></p>
+            </div>
+            <div>
+              <label htmlFor="resident-login-password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <input
+                id="resident-login-password"
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="Min 8 characters"
+                autoComplete="new-password"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setLoginTarget(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loginBusy || !loginTarget?.email}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-60"
+              >
+                {loginBusy ? 'Creating…' : 'Create Login'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );

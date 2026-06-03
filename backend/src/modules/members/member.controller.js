@@ -46,6 +46,39 @@ export const createMember = asyncHandler(async (req, res) => {
   res.status(201).json({ data: member, loginCreated });
 });
 
+// Provision a resident login for a member/flat that already exists.
+export const createMemberLogin = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body;
+
+  const member = await Member.findOne({ _id: id, societyId: req.societyId });
+  if (!member) throw new ApiError(404, 'Member not found');
+  if (!member.email) throw new ApiError(400, 'This member has no email — add one before creating a login');
+  if (!password || String(password).length < 8) {
+    throw new ApiError(400, 'Password must be at least 8 characters');
+  }
+
+  const email = member.email.toLowerCase();
+  const existing = await User.findOne({ email });
+  if (existing) throw new ApiError(409, 'A login with this email already exists');
+
+  const passwordHash = await bcrypt.hash(String(password), 10);
+  const user = await User.create({
+    name: member.name,
+    email,
+    passwordHash,
+    role: 'member',
+    societyId: req.societyId,
+    memberId: member._id,
+    flatNumber: member.flatNumber,
+  });
+
+  req.auditEntity = 'member';
+  req.auditAction = 'create_login';
+  req.auditEntityId = member._id.toString();
+  res.status(201).json({ data: { email: user.email, flatNumber: user.flatNumber } });
+});
+
 export const updateMember = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const member = await Member.findOneAndUpdate(

@@ -13,6 +13,14 @@ export async function createMemberApi(payload) {
   return res.data;
 }
 
+export async function createMemberLoginApi(id, password) {
+  const res = await apiRequest(`/members/${id}/login`, {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+  return res.data;
+}
+
 export async function updateMemberApi(id, payload) {
   const res = await apiRequest(`/members/${id}`, {
     method: 'PATCH',
