@@ -5,7 +5,7 @@ import DataState from '../components/common/DataState';
 import { isValidEmail, isValidFlatNumber, isValidPhone } from '../utils/validation';
 import { isLiveMode } from '../config/appMode';
 import { createMemberLoginApi } from '../services/memberService';
-import { Plus, Search, Users, Phone, Mail, Grid, List, Home, KeyRound } from 'lucide-react';
+import { Plus, Search, Users, Phone, Mail, Grid, List, Home, KeyRound, Eye, EyeOff } from 'lucide-react';
 
 const emptyForm = {
   flatNumber: '',
@@ -31,10 +31,13 @@ export default function Members() {
   const [loginError, setLoginError] = useState('');
   const [loginSuccess, setLoginSuccess] = useState('');
   const [loginBusy, setLoginBusy] = useState(false);
+  const [showFormPassword, setShowFormPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   const openLoginModal = (m) => {
     setLoginTarget(m);
     setLoginPassword('');
+    setShowLoginPassword(false);
     setLoginSuccess('');
     setLoginError(m.email ? '' : 'This resident has no email. Add one to their record first.');
   };
@@ -470,15 +473,25 @@ export default function Members() {
                 <label htmlFor="member-login-password" className="block text-sm font-medium text-gray-700 mb-1">
                   Login Password
                 </label>
-                <input
-                  id="member-login-password"
-                  type="password"
-                  value={form.loginPassword}
-                  onChange={(e) => updateForm('loginPassword', e.target.value)}
-                  placeholder="Min 8 characters"
-                  autoComplete="new-password"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+                <div className="relative">
+                  <input
+                    id="member-login-password"
+                    type={showFormPassword ? 'text' : 'password'}
+                    value={form.loginPassword}
+                    onChange={(e) => updateForm('loginPassword', e.target.value)}
+                    placeholder="Min 8 characters"
+                    autoComplete="new-password"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowFormPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    aria-label={showFormPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showFormPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
                 <p className="text-xs text-gray-400 mt-1">
                   The resident signs in with their email{form.email ? ` (${form.email})` : ''} and this password.
                 </p>
@@ -531,15 +544,25 @@ export default function Members() {
             </div>
             <div>
               <label htmlFor="resident-login-password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                id="resident-login-password"
-                type="password"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="Min 8 characters"
-                autoComplete="new-password"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="relative">
+                <input
+                  id="resident-login-password"
+                  type={showLoginPassword ? 'text' : 'password'}
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="Min 8 characters"
+                  autoComplete="new-password"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword((v) => !v)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <div className="flex justify-end gap-3">
               <button
