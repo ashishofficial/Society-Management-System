@@ -27,6 +27,7 @@ export function DataProvider({ children }) {
     status: m.status || 'active',
     role: m.role || 'Member',
     isCommitteeMember: Boolean(m.isCommitteeMember),
+    hasLogin: Boolean(m.hasLogin),
   });
 
   const normalizeExpense = (e) => ({
@@ -179,7 +180,10 @@ export function DataProvider({ children }) {
       createLogin: Boolean(member.createLogin),
       loginPassword: member.createLogin ? member.loginPassword : undefined,
     });
-    setMembers((prev) => [...prev, normalizeMember(created)]);
+    const normalized = normalizeMember(created);
+    // createMember returns the member doc without hasLogin; reflect the login we just asked for.
+    if (member.createLogin) normalized.hasLogin = true;
+    setMembers((prev) => [...prev, normalized]);
     return created;
   };
 

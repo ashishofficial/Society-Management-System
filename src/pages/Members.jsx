@@ -56,11 +56,12 @@ export default function Members() {
     setLoginBusy(true);
     setLoginError('');
     try {
-      await createMemberLoginApi(loginTarget.id, loginPassword);
-      setLoginSuccess(`Login created for ${loginTarget.email}`);
+      const res = await createMemberLoginApi(loginTarget.id, loginPassword);
+      setLoginSuccess(`Login ${res?.created ? 'created' : 'updated'} for ${res?.email || loginTarget.email}`);
       setLoginPassword('');
+      reloadData?.(); // refresh hasLogin flags
     } catch (err) {
-      setLoginError(err?.message || 'Failed to create login');
+      setLoginError(err?.message || 'Failed to save login');
     } finally {
       setLoginBusy(false);
     }
@@ -251,7 +252,7 @@ export default function Members() {
                         onClick={() => openLoginModal(m)}
                         className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
                       >
-                        <KeyRound className="w-3.5 h-3.5" /> Create login
+                        <KeyRound className="w-3.5 h-3.5" /> {m.hasLogin ? 'Update login' : 'Create login'}
                       </button>
                     </td>
                   </tr>
@@ -326,7 +327,7 @@ export default function Members() {
                 onClick={() => openLoginModal(m)}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800"
               >
-                <KeyRound className="w-3.5 h-3.5" /> Create login
+                <KeyRound className="w-3.5 h-3.5" /> {m.hasLogin ? 'Update login' : 'Create login'}
               </button>
             </div>
           ))}
@@ -519,7 +520,7 @@ export default function Members() {
       </Modal>
 
       {/* Create login for an existing member */}
-      <Modal isOpen={!!loginTarget} onClose={() => setLoginTarget(null)} title="Create Resident Login" size="sm">
+      <Modal isOpen={!!loginTarget} onClose={() => setLoginTarget(null)} title={loginTarget?.hasLogin ? 'Update Resident Login' : 'Create Resident Login'} size="sm">
         {loginSuccess ? (
           <div className="space-y-4">
             <p className="text-sm text-green-700 font-medium">{loginSuccess}</p>
@@ -542,6 +543,9 @@ export default function Members() {
               <p>Flat: <span className="font-medium text-gray-900">{loginTarget?.flatNumber}</span></p>
               <p>Email: <span className="font-medium text-gray-900">{loginTarget?.email || '—'}</span></p>
             </div>
+            {loginTarget?.hasLogin && (
+              <p className="text-xs text-amber-600">This resident already has a login. Setting a password will reset it.</p>
+            )}
             <div>
               <label htmlFor="resident-login-password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
               <div className="relative">
@@ -577,7 +581,9 @@ export default function Members() {
                 disabled={loginBusy || !loginTarget?.email}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-60"
               >
-                {loginBusy ? 'Creating…' : 'Create Login'}
+                {loginBusy
+                  ? (loginTarget?.hasLogin ? 'Updating…' : 'Creating…')
+                  : (loginTarget?.hasLogin ? 'Update Login' : 'Create Login')}
               </button>
             </div>
           </form>

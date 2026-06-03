@@ -6,7 +6,15 @@ import { ApiError } from '../../utils/ApiError.js';
 
 export const listMembers = asyncHandler(async (req, res) => {
   const members = await Member.find({ societyId: req.societyId }).sort({ flatNumber: 1 }).limit(5000);
-  res.json({ data: members });
+  // Flag which members already have a resident login (linked by memberId).
+  const logins = await User.find({
+    societyId: req.societyId,
+    role: 'member',
+    memberId: { $in: members.map((m) => m._id) },
+  }).select('memberId');
+  const linkedIds = new Set(logins.map((u) => String(u.memberId)));
+  const data = members.map((m) => ({ ...m.toObject(), hasLogin: linkedIds.has(String(m._id)) }));
+  res.json({ data });
 });
 
 export const createMember = asyncHandler(async (req, res) => {
@@ -46,7 +54,8 @@ export const createMember = asyncHandler(async (req, res) => {
   res.status(201).json({ data: member, loginCreated });
 });
 
-// Provision a resident login for a member/flat that already exists.
+// Create OR update a resident login for a member/flat that already exists.
+// If a login is already linked to this member, the password is reset; otherwise it's created.
 export const createMemberLogin = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { password } = req.body;
@@ -59,24 +68,37 @@ export const createMemberLogin = asyncHandler(async (req, res) => {
   }
 
   const email = member.email.toLowerCase();
-  const existing = await User.findOne({ email });
-  if (existing) throw new ApiError(409, 'A login with this email already exists');
-
   const passwordHash = await bcrypt.hash(String(password), 10);
-  const user = await User.create({
-    name: member.name,
-    email,
-    passwordHash,
-    role: 'member',
-    societyId: req.societyId,
-    memberId: member._id,
-    flatNumber: member.flatNumber,
-  });
+
+  // Existing login linked to this member -> update (reset) the password.
+  let user = await User.findOne({ societyId: req.societyId, role: 'member', memberId: member._id });
+  let created = false;
+  if (user) {
+    user.passwordHash = passwordHash;
+    user.email = email;
+    user.name = member.name;
+    user.flatNumber = member.flatNumber;
+    await user.save();
+  } else {
+    // No login yet — don't hijack an unrelated account that already uses this email.
+    const emailOwner = await User.findOne({ email });
+    if (emailOwner) throw new ApiError(409, 'A different account already uses this email');
+    user = await User.create({
+      name: member.name,
+      email,
+      passwordHash,
+      role: 'member',
+      societyId: req.societyId,
+      memberId: member._id,
+      flatNumber: member.flatNumber,
+    });
+    created = true;
+  }
 
   req.auditEntity = 'member';
-  req.auditAction = 'create_login';
+  req.auditAction = created ? 'create_login' : 'update_login';
   req.auditEntityId = member._id.toString();
-  res.status(201).json({ data: { email: user.email, flatNumber: user.flatNumber } });
+  res.status(created ? 201 : 200).json({ data: { email: user.email, flatNumber: user.flatNumber, created } });
 });
 
 export const updateMember = asyncHandler(async (req, res) => {
