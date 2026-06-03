@@ -5,7 +5,12 @@ import { formatCurrency } from '../utils/formatCurrency';
 import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
-import { createFacilityBookingApi, listFacilitiesApi, listFacilityBookingsApi, updateFacilityBookingStatusApi } from '../services/facilityService';
+import {
+  useGetFacilitiesQuery,
+  useGetFacilityBookingsQuery,
+  useCreateFacilityBookingMutation,
+  useUpdateFacilityBookingStatusMutation,
+} from '../store/apiSlice';
 
 const bookingStatusConfig = {
   confirmed: { label: 'Confirmed', color: 'bg-emerald-100 text-emerald-700', icon: CheckCircle2 },
@@ -32,8 +37,6 @@ const colorByType = {
 };
 
 export default function Facilities() {
-  const [facilities, setFacilities] = useState([]);
-  const [bookings, setBookings] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [activeTab, setActiveTab] = useState('facilities');
   const [form, setForm] = useState({
@@ -46,16 +49,17 @@ export default function Facilities() {
   });
   const { toast, showToast, clearToast } = useToast();
 
+  // RTK Query: data is fetched & cached automatically; mutations invalidate the cache to refetch.
+  const { data: facilities = [] } = useGetFacilitiesQuery();
+  const { data: bookings = [], error } = useGetFacilityBookingsQuery();
+  const [createBooking] = useCreateFacilityBookingMutation();
+  const [updateBookingStatus] = useUpdateFacilityBookingStatusMutation();
+
   const todayIso = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    Promise.all([listFacilitiesApi(), listFacilityBookingsApi()])
-      .then(([f, b]) => {
-        setFacilities(Array.isArray(f) ? f : []);
-        setBookings(Array.isArray(b) ? b : []);
-      })
-      .catch((err) => showToast('error', err.message || 'Failed to load facilities'));
-  }, []);
+    if (error) showToast('error', error?.data?.message || 'Failed to load facilities');
+  }, [error, showToast]);
 
   const upcomingBookings = useMemo(() => {
     return bookings
@@ -172,10 +176,14 @@ export default function Facilities() {
                         <p className="text-sm font-semibold text-gray-900">{formatCurrency(b.amount)}</p>
                         <select
                           value={b.status}
-                          onChange={(e) => updateFacilityBookingStatusApi(bookingId, e.target.value).then((updated) => {
-                            setBookings((prev) => prev.map((x) => ((x._id || x.id) === bookingId ? updated : x)));
-                            showToast('success', 'Booking status updated');
-                          }).catch((err) => showToast('error', err.message || 'Failed to update booking'))}
+                          onChange={async (e) => {
+                            try {
+                              await updateBookingStatus({ id: bookingId, status: e.target.value }).unwrap();
+                              showToast('success', 'Booking status updated');
+                            } catch (err) {
+                              showToast('error', err?.data?.message || 'Failed to update booking');
+                            }
+                          }}
                           className="text-xs border rounded-md px-2 py-1"
                         >
                           <option value="pending">Pending</option>
@@ -232,21 +240,21 @@ export default function Facilities() {
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Book a Facility" size="md">
         <form
           className="space-y-4"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             const selected = facilities.find((f) => (f._id || f.id) === form.facilityId);
-            createFacilityBookingApi({
-              ...form,
-              amount: selected?.pricePerSlot || 0,
-              status: 'pending',
-            })
-              .then((created) => {
-                setBookings((prev) => [created, ...prev]);
-                setShowModal(false);
-                setForm({ facilityId: '', date: '', timeSlot: '', purpose: '', flat: '', residentName: '' });
-                showToast('success', 'Booking created');
-              })
-              .catch((err) => showToast('error', err.message || 'Failed to create booking'));
+            try {
+              await createBooking({
+                ...form,
+                amount: selected?.pricePerSlot || 0,
+                status: 'pending',
+              }).unwrap();
+              setShowModal(false);
+              setForm({ facilityId: '', date: '', timeSlot: '', purpose: '', flat: '', residentName: '' });
+              showToast('success', 'Booking created');
+            } catch (err) {
+              showToast('error', err?.data?.message || 'Failed to create booking');
+            }
           }}
         >
           <div>

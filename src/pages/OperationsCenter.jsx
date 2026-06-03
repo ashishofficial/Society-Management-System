@@ -1,31 +1,42 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AlarmSmoke, CarFront, FileText, Package, Shield, Users } from 'lucide-react';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
 import { isValidFlatNumber } from '../utils/validation';
 import {
-  createDocumentApi,
-  createEmergencyAlertApi,
-  createParcelApi,
-  createParkingApi,
-  createStaffApi,
-  listDocumentsApi,
-  listEmergencyAlertsApi,
-  listParcelsApi,
-  listParkingApi,
-  listStaffApi,
-  markParcelDeliveredApi,
-  updateEmergencyStatusApi,
-  updateStaffAttendanceApi,
-} from '../services/operationsService';
+  useGetParkingQuery,
+  useCreateParkingMutation,
+  useGetStaffQuery,
+  useCreateStaffMutation,
+  useUpdateStaffAttendanceMutation,
+  useGetParcelsQuery,
+  useCreateParcelMutation,
+  useMarkParcelDeliveredMutation,
+  useGetDocumentsQuery,
+  useCreateDocumentMutation,
+  useGetEmergencyAlertsQuery,
+  useCreateEmergencyAlertMutation,
+  useUpdateEmergencyStatusMutation,
+} from '../store/apiSlice';
 
 export default function OperationsCenter() {
   const { toast, showToast, clearToast } = useToast();
-  const [parking, setParking] = useState([]);
-  const [staff, setStaff] = useState([]);
-  const [parcels, setParcels] = useState([]);
-  const [docs, setDocs] = useState([]);
-  const [alerts, setAlerts] = useState([]);
+
+  // RTK Query: data is fetched & cached automatically; mutations invalidate the cache to refetch.
+  const { data: parking = [] } = useGetParkingQuery();
+  const { data: staff = [] } = useGetStaffQuery();
+  const { data: parcels = [] } = useGetParcelsQuery();
+  const { data: docs = [] } = useGetDocumentsQuery();
+  const { data: alerts = [] } = useGetEmergencyAlertsQuery();
+
+  const [createParking] = useCreateParkingMutation();
+  const [createStaff] = useCreateStaffMutation();
+  const [updateStaffAttendance] = useUpdateStaffAttendanceMutation();
+  const [createParcel] = useCreateParcelMutation();
+  const [markParcelDelivered] = useMarkParcelDeliveredMutation();
+  const [createDocument] = useCreateDocumentMutation();
+  const [createEmergencyAlert] = useCreateEmergencyAlertMutation();
+  const [updateEmergencyStatus] = useUpdateEmergencyStatusMutation();
 
   const [slotNumber, setSlotNumber] = useState('');
   const [staffForm, setStaffForm] = useState({ name: '', role: '' });
@@ -33,29 +44,6 @@ export default function OperationsCenter() {
   const [docForm, setDocForm] = useState({ title: '', category: '', url: '' });
   const [alertForm, setAlertForm] = useState({ flat: '', raisedBy: '', type: 'other', notes: '' });
   const [formError, setFormError] = useState('');
-
-  const load = async () => {
-    try {
-      const [p, s, pa, d, a] = await Promise.all([
-        listParkingApi(),
-        listStaffApi(),
-        listParcelsApi(),
-        listDocumentsApi(),
-        listEmergencyAlertsApi(),
-      ]);
-      setParking(p);
-      setStaff(s);
-      setParcels(pa);
-      setDocs(d);
-      setAlerts(a);
-    } catch (err) {
-      showToast('error', err.message || 'Failed to load operations data');
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
 
   const statCards = [
     { label: 'Parking Slots', value: parking.length, icon: CarFront, tone: 'text-blue-700 bg-blue-50' },
@@ -117,13 +105,12 @@ export default function OperationsCenter() {
                   return;
                 }
                 try {
-                  await createParkingApi({ slotNumber });
+                  await createParking({ slotNumber }).unwrap();
                   setSlotNumber('');
                   setFormError('');
                   showToast('success', 'Parking slot added');
-                  load();
                 } catch (err) {
-                  showToast('error', err.message || 'Failed to add slot');
+                  showToast('error', err?.data?.message || 'Failed to add slot');
                 }
               }}
               className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
@@ -162,13 +149,12 @@ export default function OperationsCenter() {
                   return;
                 }
                 try {
-                  await createStaffApi(staffForm);
+                  await createStaff(staffForm).unwrap();
                   setStaffForm({ name: '', role: '' });
                   setFormError('');
                   showToast('success', 'Staff added');
-                  load();
                 } catch (err) {
-                  showToast('error', err.message || 'Failed to add staff');
+                  showToast('error', err?.data?.message || 'Failed to add staff');
                 }
               }}
               className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
@@ -194,8 +180,11 @@ export default function OperationsCenter() {
                   <button
                     onClick={async () => {
                       const next = item.attendanceStatus === 'present' ? 'absent' : 'present';
-                      await updateStaffAttendanceApi(item._id, { attendanceStatus: next });
-                      load();
+                      try {
+                        await updateStaffAttendance({ id: item._id, payload: { attendanceStatus: next } }).unwrap();
+                      } catch (err) {
+                        showToast('error', err?.data?.message || 'Failed to update attendance');
+                      }
                     }}
                     className="text-xs px-2 py-1 bg-white border border-gray-200 hover:bg-gray-100 rounded transition-colors"
                   >
@@ -222,12 +211,11 @@ export default function OperationsCenter() {
                   return;
                 }
                 try {
-                  await createParcelApi(parcelForm);
+                  await createParcel(parcelForm).unwrap();
                   setParcelForm({ flat: '', recipientName: '' });
                   setFormError('');
-                  load();
                 } catch (err) {
-                  showToast('error', err.message || 'Failed to add parcel');
+                  showToast('error', err?.data?.message || 'Failed to add parcel');
                 }
               }}
               className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
@@ -243,7 +231,13 @@ export default function OperationsCenter() {
                   <p className="text-xs text-gray-500">{item.status}</p>
                 </div>
                 {item.status !== 'delivered' && (
-                  <button onClick={async () => { await markParcelDeliveredApi(item._id); load(); }} className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200 transition-colors">
+                  <button onClick={async () => {
+                    try {
+                      await markParcelDelivered(item._id).unwrap();
+                    } catch (err) {
+                      showToast('error', err?.data?.message || 'Failed to mark delivered');
+                    }
+                  }} className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200 transition-colors">
                     Delivered
                   </button>
                 )}
@@ -272,12 +266,11 @@ export default function OperationsCenter() {
                 return;
               }
               try {
-                await createDocumentApi(docForm);
+                await createDocument(docForm).unwrap();
                 setDocForm({ title: '', category: '', url: '' });
                 setFormError('');
-                load();
               } catch (err) {
-                showToast('error', err.message || 'Failed to add document');
+                showToast('error', err?.data?.message || 'Failed to add document');
               }
             }}
             className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors mb-3"
@@ -315,12 +308,11 @@ export default function OperationsCenter() {
               return;
             }
             try {
-              await createEmergencyAlertApi(alertForm);
+              await createEmergencyAlert(alertForm).unwrap();
               setAlertForm({ flat: '', raisedBy: '', type: 'other', notes: '' });
               setFormError('');
-              load();
             } catch (err) {
-              showToast('error', err.message || 'Failed to raise alert');
+              showToast('error', err?.data?.message || 'Failed to raise alert');
             }
           }}
           className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition-colors mb-3"
@@ -337,7 +329,13 @@ export default function OperationsCenter() {
               {item.status !== 'closed' ? (
                 <button
                   className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200 transition-colors"
-                  onClick={async () => { await updateEmergencyStatusApi(item._id, { status: 'acknowledged' }); load(); }}
+                  onClick={async () => {
+                    try {
+                      await updateEmergencyStatus({ id: item._id, payload: { status: 'acknowledged' } }).unwrap();
+                    } catch (err) {
+                      showToast('error', err?.data?.message || 'Failed to acknowledge alert');
+                    }
+                  }}
                 >
                   Acknowledge
                 </button>

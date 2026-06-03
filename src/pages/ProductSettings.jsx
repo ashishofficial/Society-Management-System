@@ -2,31 +2,29 @@ import { useEffect, useState } from 'react';
 import { Bell, Boxes, Settings2, ShieldCheck } from 'lucide-react';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
+import { registerDeviceTokenApi } from '../services/productService';
 import {
-  getProductSettingsApi,
-  listBackupsApi,
-  registerDeviceTokenApi,
-  triggerBackupApi,
-  updateProductSettingsApi,
-} from '../services/productService';
+  useGetProductSettingsQuery,
+  useUpdateProductSettingsMutation,
+  useGetBackupsQuery,
+  useTriggerBackupMutation,
+} from '../store/apiSlice';
 
 export default function ProductSettings() {
   const { toast, showToast, clearToast } = useToast();
   const [settings, setSettings] = useState(null);
-  const [backups, setBackups] = useState([]);
   const [token, setToken] = useState('');
 
-  const load = async () => {
-    try {
-      const [s, b] = await Promise.all([getProductSettingsApi(), listBackupsApi()]);
-      setSettings(s);
-      setBackups(b);
-    } catch (err) {
-      showToast('error', err.message || 'Failed to load product settings');
-    }
-  };
+  // RTK Query: data is fetched & cached automatically; mutations invalidate the cache to refetch.
+  const { data: settingsData } = useGetProductSettingsQuery();
+  const { data: backups = [] } = useGetBackupsQuery();
+  const [updateSettings] = useUpdateProductSettingsMutation();
+  const [triggerBackup] = useTriggerBackupMutation();
 
-  useEffect(() => { load(); }, []);
+  // Seed local editable form state from the query data when it arrives.
+  useEffect(() => {
+    if (settingsData) setSettings(settingsData);
+  }, [settingsData]);
 
   const stats = [
     { label: 'Backups', value: backups.length, icon: Boxes, tone: 'text-blue-700 bg-blue-50' },
@@ -75,11 +73,10 @@ export default function ProductSettings() {
             className="mt-4 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
             onClick={async () => {
               try {
-                await updateProductSettingsApi(settings);
+                await updateSettings(settings).unwrap();
                 showToast('success', 'Settings updated');
-                load();
               } catch (err) {
-                showToast('error', err.message || 'Failed to update settings');
+                showToast('error', err?.data?.message || 'Failed to update settings');
               }
             }}
           >
@@ -103,7 +100,7 @@ export default function ProductSettings() {
 
       <section className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
         <h2 className="font-semibold text-gray-900 mb-4">Backup & Restore</h2>
-        <button className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg mb-4 font-medium transition-colors" onClick={async () => { await triggerBackupApi({ type: 'manual' }); showToast('success', 'Backup triggered'); load(); }}>
+        <button className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg mb-4 font-medium transition-colors" onClick={async () => { try { await triggerBackup({ type: 'manual' }).unwrap(); showToast('success', 'Backup triggered'); } catch (err) { showToast('error', err?.data?.message || 'Failed to trigger backup'); } }}>
           Trigger Backup
         </button>
         <ul className="space-y-2">

@@ -4,7 +4,12 @@ import { formatDate } from '../utils/formatDate';
 import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
-import { createNoticeApi, deleteNoticeApi, listNoticesApi, updateNoticeApi } from '../services/noticeService';
+import {
+  useGetNoticesQuery,
+  useCreateNoticeMutation,
+  useUpdateNoticeMutation,
+  useDeleteNoticeMutation,
+} from '../store/apiSlice';
 
 const categoryConfig = {
   general: { label: 'General', color: 'bg-blue-100 text-blue-700', icon: Bell },
@@ -15,7 +20,6 @@ const categoryConfig = {
 };
 
 export default function Notices() {
-  const [records, setRecords] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showModal, setShowModal] = useState(false);
@@ -23,11 +27,15 @@ export default function Notices() {
   const [form, setForm] = useState({ title: '', description: '', category: 'general', pinned: false });
   const { toast, showToast, clearToast } = useToast();
 
+  // RTK Query: data is fetched & cached automatically; mutations invalidate the cache to refetch.
+  const { data: records = [], error } = useGetNoticesQuery();
+  const [createNotice] = useCreateNoticeMutation();
+  const [updateNotice] = useUpdateNoticeMutation();
+  const [deleteNotice] = useDeleteNoticeMutation();
+
   useEffect(() => {
-    listNoticesApi()
-      .then((data) => setRecords(Array.isArray(data) ? data : []))
-      .catch((err) => showToast('error', err.message || 'Failed to load notices'));
-  }, []);
+    if (error) showToast('error', error?.data?.message || 'Failed to load notices');
+  }, [error, showToast]);
 
   const filtered = useMemo(() => {
     let list = [...records];
@@ -117,10 +125,14 @@ export default function Notices() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => updateNoticeApi(noticeId, { pinned: !notice.pinned }).then((updated) => {
-                          setRecords((prev) => prev.map((n) => ((n._id || n.id) === noticeId ? updated : n)));
-                          showToast('success', notice.pinned ? 'Notice unpinned' : 'Notice pinned');
-                        }).catch((err) => showToast('error', err.message || 'Failed to update notice'))}
+                        onClick={async () => {
+                          try {
+                            await updateNotice({ id: noticeId, payload: { pinned: !notice.pinned } }).unwrap();
+                            showToast('success', notice.pinned ? 'Notice unpinned' : 'Notice pinned');
+                          } catch (err) {
+                            showToast('error', err?.data?.message || 'Failed to update notice');
+                          }
+                        }}
                         className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
                       >
                         {notice.pinned ? 'Unpin' : 'Pin'}
@@ -163,19 +175,19 @@ export default function Notices() {
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Post Notice" size="md">
         <form
           className="space-y-4"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            createNoticeApi({
-              ...form,
-              date: new Date().toISOString().split('T')[0],
-            })
-              .then((created) => {
-                setRecords((prev) => [created, ...prev]);
-                setShowModal(false);
-                setForm({ title: '', description: '', category: 'general', pinned: false });
-                showToast('success', 'Notice posted');
-              })
-              .catch((err) => showToast('error', err.message || 'Failed to post notice'));
+            try {
+              await createNotice({
+                ...form,
+                date: new Date().toISOString().split('T')[0],
+              }).unwrap();
+              setShowModal(false);
+              setForm({ title: '', description: '', category: 'general', pinned: false });
+              showToast('success', 'Notice posted');
+            } catch (err) {
+              showToast('error', err?.data?.message || 'Failed to post notice');
+            }
           }}
         >
           <input className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Title" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} required />
@@ -201,16 +213,17 @@ export default function Notices() {
           <button type="button" onClick={() => setDeleteTarget(null)} className="px-3 py-2 text-sm bg-gray-100 rounded-lg">Cancel</button>
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               const targetId = deleteTarget?.id;
               if (!targetId) return;
-              deleteNoticeApi(targetId)
-                .then(() => {
-                  setRecords((prev) => prev.filter((n) => (n._id || n.id) !== targetId));
-                  showToast('success', 'Notice deleted');
-                })
-                .catch((err) => showToast('error', err.message || 'Failed to delete notice'))
-                .finally(() => setDeleteTarget(null));
+              try {
+                await deleteNotice(targetId).unwrap();
+                showToast('success', 'Notice deleted');
+              } catch (err) {
+                showToast('error', err?.data?.message || 'Failed to delete notice');
+              } finally {
+                setDeleteTarget(null);
+              }
             }}
             className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg"
           >

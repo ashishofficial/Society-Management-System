@@ -3,7 +3,12 @@ import { Search, UserCheck, UserPlus, LogIn, LogOut, Clock, XCircle, Package, Ca
 import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
-import { createVisitorApi, deleteVisitorApi, listVisitorsApi, updateVisitorStatusApi } from '../services/visitorService';
+import {
+  useGetVisitorsQuery,
+  useCreateVisitorMutation,
+  useUpdateVisitorStatusMutation,
+  useDeleteVisitorMutation,
+} from '../store/apiSlice';
 
 const statusConfig = {
   checked_in: { label: 'Checked In', color: 'bg-emerald-100 text-emerald-700', icon: LogIn },
@@ -21,7 +26,6 @@ const purposeIcons = {
 };
 
 export default function Visitors() {
-  const [records, setRecords] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
@@ -29,11 +33,15 @@ export default function Visitors() {
   const [form, setForm] = useState({ name: '', flat: '', purpose: '', contact: '', vehicle: '' });
   const { toast, showToast, clearToast } = useToast();
 
+  // RTK Query: data is fetched & cached automatically; mutations invalidate the cache to refetch.
+  const { data: records = [], error } = useGetVisitorsQuery();
+  const [createVisitor] = useCreateVisitorMutation();
+  const [updateVisitorStatus] = useUpdateVisitorStatusMutation();
+  const [deleteVisitor] = useDeleteVisitorMutation();
+
   useEffect(() => {
-    listVisitorsApi()
-      .then((data) => setRecords(Array.isArray(data) ? data : []))
-      .catch((err) => showToast('error', err.message || 'Failed to load visitors'));
-  }, []);
+    if (error) showToast('error', error?.data?.message || 'Failed to load visitors');
+  }, [error, showToast]);
 
   const stats = useMemo(() => ({
     total: records.length,
@@ -117,14 +125,14 @@ export default function Visitors() {
                   <select
                     className="text-xs border rounded px-2 py-1"
                     value={v.status}
-                    onChange={(e) =>
-                      updateVisitorStatusApi(v._id || v.id, e.target.value)
-                        .then((updated) => {
-                          setRecords((prev) => prev.map((x) => ((x._id || x.id) === (v._id || v.id) ? updated : x)));
-                          showToast('success', 'Visitor status updated');
-                        })
-                        .catch((err) => showToast('error', err.message || 'Failed to update visitor'))
-                    }
+                    onChange={async (e) => {
+                      try {
+                        await updateVisitorStatus({ id: v._id || v.id, status: e.target.value }).unwrap();
+                        showToast('success', 'Visitor status updated');
+                      } catch (err) {
+                        showToast('error', err?.data?.message || 'Failed to update visitor');
+                      }
+                    }}
                   >
                     {Object.entries(statusConfig).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                   </select>
@@ -184,14 +192,14 @@ export default function Visitors() {
                         <select
                           className="text-xs border rounded px-1.5 py-1"
                           value={v.status}
-                          onChange={(e) =>
-                            updateVisitorStatusApi(v._id || v.id, e.target.value)
-                              .then((updated) => {
-                                setRecords((prev) => prev.map((x) => ((x._id || x.id) === (v._id || v.id) ? updated : x)));
-                                showToast('success', 'Visitor status updated');
-                              })
-                              .catch((err) => showToast('error', err.message || 'Failed to update visitor'))
-                          }
+                          onChange={async (e) => {
+                            try {
+                              await updateVisitorStatus({ id: v._id || v.id, status: e.target.value }).unwrap();
+                              showToast('success', 'Visitor status updated');
+                            } catch (err) {
+                              showToast('error', err?.data?.message || 'Failed to update visitor');
+                            }
+                          }}
                         >
                           {Object.entries(statusConfig).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                         </select>
@@ -221,20 +229,21 @@ export default function Visitors() {
 
       {/* Pre-approve modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Pre-approve Visitor" size="md">
-        <form className="space-y-4" onSubmit={(e) => {
+        <form className="space-y-4" onSubmit={async (e) => {
           e.preventDefault();
-          createVisitorApi({
-            ...form,
-            preApproved: true,
-            status: 'expected',
-          })
-            .then((created) => {
-              setRecords((prev) => [created, ...prev]);
-              setForm({ name: '', flat: '', purpose: '', contact: '', vehicle: '' });
-              showToast('success', 'Visitor pre-approved');
-            })
-            .catch((err) => showToast('error', err.message || 'Failed to create visitor'))
-            .finally(() => setShowModal(false));
+          try {
+            await createVisitor({
+              ...form,
+              preApproved: true,
+              status: 'expected',
+            }).unwrap();
+            setForm({ name: '', flat: '', purpose: '', contact: '', vehicle: '' });
+            showToast('success', 'Visitor pre-approved');
+          } catch (err) {
+            showToast('error', err?.data?.message || 'Failed to create visitor');
+          } finally {
+            setShowModal(false);
+          }
         }}>
           <div>
             <label htmlFor="visitor-name" className="block text-sm font-medium text-gray-700 mb-1">Visitor Name</label>
@@ -277,16 +286,17 @@ export default function Visitors() {
           <button type="button" onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               const id = deleteTarget?.id;
               if (!id) return;
-              deleteVisitorApi(id)
-                .then(() => {
-                  setRecords((prev) => prev.filter((x) => (x._id || x.id) !== id));
-                  showToast('success', 'Visitor deleted');
-                })
-                .catch((err) => showToast('error', err.message || 'Failed to delete visitor'))
-                .finally(() => setDeleteTarget(null));
+              try {
+                await deleteVisitor(id).unwrap();
+                showToast('success', 'Visitor deleted');
+              } catch (err) {
+                showToast('error', err?.data?.message || 'Failed to delete visitor');
+              } finally {
+                setDeleteTarget(null);
+              }
             }}
             className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
           >

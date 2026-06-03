@@ -1,20 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { BellRing, CalendarDays, Megaphone, Vote } from 'lucide-react';
 import Toast from '../components/common/Toast';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/useToast';
 import {
-  closePollApi,
-  createAnnouncementApi,
-  createEventApi,
-  createPollApi,
-  escalateComplaintsApi,
-  listAnnouncementsApi,
-  listEventsApi,
-  listPollsApi,
-  rsvpEventApi,
-  votePollApi,
-} from '../services/governanceService';
+  useGetPollsQuery,
+  useGetEventsQuery,
+  useGetAnnouncementsQuery,
+  useCreatePollMutation,
+  useVotePollMutation,
+  useClosePollMutation,
+  useCreateEventMutation,
+  useRsvpEventMutation,
+  useCreateAnnouncementMutation,
+  useEscalateComplaintsMutation,
+} from '../store/apiSlice';
 
 // Demo fallback only: the demo member login isn't linked to a flat the way a live member is.
 const MEMBER_FLAT_BY_EMAIL = {
@@ -27,25 +27,21 @@ export default function GovernanceHub() {
   // Prefer the authenticated user's real flat; never silently attribute votes to a fixed flat.
   const actorFlat = user?.flatNumber || MEMBER_FLAT_BY_EMAIL[user?.email] || MEMBER_FLAT_BY_EMAIL[user?.username] || '';
   const actorName = user?.name || 'Resident';
-  const [polls, setPolls] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [announcements, setAnnouncements] = useState([]);
   const [pollForm, setPollForm] = useState({ title: '', options: 'Yes,No' });
   const [eventForm, setEventForm] = useState({ title: '', date: '' });
   const [announcementForm, setAnnouncementForm] = useState({ title: '', message: '' });
 
-  const load = async () => {
-    try {
-      const [p, e, a] = await Promise.all([listPollsApi(), listEventsApi(), listAnnouncementsApi()]);
-      setPolls(p);
-      setEvents(e);
-      setAnnouncements(a);
-    } catch (err) {
-      showToast('error', err.message || 'Failed to load governance data');
-    }
-  };
-
-  useEffect(() => { load(); }, []);
+  // RTK Query: data is fetched & cached automatically; mutations invalidate the cache to refetch.
+  const { data: polls = [] } = useGetPollsQuery();
+  const { data: events = [] } = useGetEventsQuery();
+  const { data: announcements = [] } = useGetAnnouncementsQuery();
+  const [createPoll] = useCreatePollMutation();
+  const [votePoll] = useVotePollMutation();
+  const [closePoll] = useClosePollMutation();
+  const [createEvent] = useCreateEventMutation();
+  const [rsvpEvent] = useRsvpEventMutation();
+  const [createAnnouncement] = useCreateAnnouncementMutation();
+  const [escalateComplaints] = useEscalateComplaintsMutation();
 
   const stats = [
     { label: 'Active Polls', value: polls.filter((p) => !p.isClosed).length, icon: Vote, tone: 'text-blue-700 bg-blue-50' },
@@ -61,7 +57,7 @@ export default function GovernanceHub() {
             <h1 className="text-2xl font-bold">Governance Hub</h1>
             <p className="text-sm text-slate-200 mt-1">Run polls, publish updates and coordinate society events.</p>
           </div>
-          <button className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition-colors" onClick={async () => { const res = await escalateComplaintsApi(); showToast('success', `Escalated: ${res?.escalatedCount || 0}`); }}>
+          <button className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition-colors" onClick={async () => { try { const res = await escalateComplaints().unwrap(); showToast('success', `Escalated: ${res?.escalatedCount || 0}`); } catch (err) { showToast('error', err?.data?.message || 'Failed to escalate complaints'); } }}>
             Escalate Overdue Complaints
           </button>
         </div>
@@ -90,7 +86,7 @@ export default function GovernanceHub() {
           </div>
           <input placeholder="Poll title" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500" value={pollForm.title} onChange={(e) => setPollForm((p) => ({ ...p, title: e.target.value }))} />
           <input placeholder="Options comma separated" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500" value={pollForm.options} onChange={(e) => setPollForm((p) => ({ ...p, options: e.target.value }))} />
-          <button className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg mb-4 font-medium transition-colors" onClick={async () => { await createPollApi({ title: pollForm.title, options: pollForm.options.split(',').map((s) => s.trim()).filter(Boolean) }); setPollForm({ title: '', options: 'Yes,No' }); load(); }}>
+          <button className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg mb-4 font-medium transition-colors" onClick={async () => { try { await createPoll({ title: pollForm.title, options: pollForm.options.split(',').map((s) => s.trim()).filter(Boolean) }).unwrap(); setPollForm({ title: '', options: 'Yes,No' }); showToast('success', 'Poll created'); } catch (err) { showToast('error', err?.data?.message || 'Failed to create poll'); } }}>
             Create Poll
           </button>
           <ul className="space-y-2 max-h-72 overflow-auto pr-1">
@@ -103,8 +99,8 @@ export default function GovernanceHub() {
                   </span>
                 </div>
                 <div className="flex gap-2 mt-2">
-                  {!poll.isClosed && <button className="text-xs px-2 py-1 bg-green-100 hover:bg-green-200 rounded transition-colors" onClick={async () => { if (!actorFlat) { showToast('error', 'Only residents linked to a flat can vote'); return; } await votePollApi(poll._id, { flat: actorFlat, optionIndex: 0 }); load(); }}>Vote Yes</button>}
-                  {!poll.isClosed && <button className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors" onClick={async () => { await closePollApi(poll._id); load(); }}>Close</button>}
+                  {!poll.isClosed && <button className="text-xs px-2 py-1 bg-green-100 hover:bg-green-200 rounded transition-colors" onClick={async () => { if (!actorFlat) { showToast('error', 'Only residents linked to a flat can vote'); return; } try { await votePoll({ id: poll._id, payload: { flat: actorFlat, optionIndex: 0 } }).unwrap(); showToast('success', 'Vote recorded'); } catch (err) { showToast('error', err?.data?.message || 'Failed to record vote'); } }}>Vote Yes</button>}
+                  {!poll.isClosed && <button className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors" onClick={async () => { try { await closePoll(poll._id).unwrap(); showToast('success', 'Poll closed'); } catch (err) { showToast('error', err?.data?.message || 'Failed to close poll'); } }}>Close</button>}
                 </div>
               </li>
             ))}
@@ -118,7 +114,7 @@ export default function GovernanceHub() {
           </div>
           <input placeholder="Event title" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500" value={eventForm.title} onChange={(e) => setEventForm((p) => ({ ...p, title: e.target.value }))} />
           <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500" value={eventForm.date} onChange={(e) => setEventForm((p) => ({ ...p, date: e.target.value }))} />
-          <button className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg mb-4 font-medium transition-colors" onClick={async () => { await createEventApi(eventForm); setEventForm({ title: '', date: '' }); load(); }}>
+          <button className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg mb-4 font-medium transition-colors" onClick={async () => { try { await createEvent(eventForm).unwrap(); setEventForm({ title: '', date: '' }); showToast('success', 'Event created'); } catch (err) { showToast('error', err?.data?.message || 'Failed to create event'); } }}>
             Create Event
           </button>
           <ul className="space-y-2 max-h-72 overflow-auto pr-1">
@@ -128,7 +124,7 @@ export default function GovernanceHub() {
                   <p className="text-sm font-medium text-gray-800">{event.title}</p>
                   <p className="text-xs text-gray-500">{event.date}</p>
                 </div>
-                <button className="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 rounded transition-colors" onClick={async () => { if (!actorFlat) { showToast('error', 'Only residents linked to a flat can RSVP'); return; } await rsvpEventApi(event._id, { flat: actorFlat, residentName: actorName, status: 'yes' }); load(); }}>
+                <button className="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 rounded transition-colors" onClick={async () => { if (!actorFlat) { showToast('error', 'Only residents linked to a flat can RSVP'); return; } try { await rsvpEvent({ id: event._id, payload: { flat: actorFlat, residentName: actorName, status: 'yes' } }).unwrap(); showToast('success', 'RSVP recorded'); } catch (err) { showToast('error', err?.data?.message || 'Failed to RSVP'); } }}>
                   RSVP
                 </button>
               </li>
@@ -143,7 +139,7 @@ export default function GovernanceHub() {
           </div>
           <input placeholder="Title" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500" value={announcementForm.title} onChange={(e) => setAnnouncementForm((p) => ({ ...p, title: e.target.value }))} />
           <textarea placeholder="Message" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500" rows={3} value={announcementForm.message} onChange={(e) => setAnnouncementForm((p) => ({ ...p, message: e.target.value }))} />
-          <button className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg mb-4 font-medium transition-colors" onClick={async () => { await createAnnouncementApi(announcementForm); setAnnouncementForm({ title: '', message: '' }); load(); }}>
+          <button className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg mb-4 font-medium transition-colors" onClick={async () => { try { await createAnnouncement(announcementForm).unwrap(); setAnnouncementForm({ title: '', message: '' }); showToast('success', 'Announcement published'); } catch (err) { showToast('error', err?.data?.message || 'Failed to publish announcement'); } }}>
             Publish
           </button>
           <ul className="space-y-2 max-h-72 overflow-auto pr-1">

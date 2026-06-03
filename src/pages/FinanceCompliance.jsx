@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { BadgeDollarSign, ChartPie, Landmark, ShieldCheck } from 'lucide-react';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
 import {
-  autoMatchReconciliationApi,
-  createBudgetApi,
-  createReconciliationApi,
-  getBudgetVarianceApi,
-  getComplianceSummaryApi,
-  listBudgetsApi,
-  listReconciliationApi,
-} from '../services/financeService';
+  useGetBudgetsQuery,
+  useGetBudgetVarianceQuery,
+  useGetReconciliationQuery,
+  useGetComplianceSummaryQuery,
+  useCreateBudgetMutation,
+  useCreateReconciliationMutation,
+  useAutoMatchReconciliationMutation,
+} from '../store/apiSlice';
 import { formatCurrency } from '../utils/formatCurrency';
 import { isPositiveAmount } from '../utils/validation';
 
@@ -22,32 +22,18 @@ export default function FinanceCompliance() {
     return `${start}-${start + 1}`;
   });
   const [year, setYear] = useState(yearOptions[2]);
-  const [budgets, setBudgets] = useState([]);
-  const [variance, setVariance] = useState([]);
-  const [recon, setRecon] = useState([]);
-  const [summary, setSummary] = useState(null);
   const [budgetForm, setBudgetForm] = useState({ category: '', budgetedAmount: '' });
   const [reconForm, setReconForm] = useState({ date: '', reference: '', amount: '', type: 'credit' });
   const [formError, setFormError] = useState('');
 
-  const load = async () => {
-    try {
-      const [b, v, r, s] = await Promise.all([
-        listBudgetsApi(year),
-        getBudgetVarianceApi(year),
-        listReconciliationApi(year),
-        getComplianceSummaryApi({ financialYear: year }),
-      ]);
-      setBudgets(b);
-      setVariance(v);
-      setRecon(r);
-      setSummary(s);
-    } catch (err) {
-      showToast('error', err.message || 'Failed to load finance data');
-    }
-  };
-
-  useEffect(() => { load(); }, [year]);
+  // RTK Query: data is fetched & cached automatically and refetches when `year` changes.
+  const { data: budgets = [] } = useGetBudgetsQuery(year);
+  const { data: variance = [] } = useGetBudgetVarianceQuery(year);
+  const { data: recon = [] } = useGetReconciliationQuery(year);
+  const { data: summary = null } = useGetComplianceSummaryQuery({ financialYear: year });
+  const [createBudget] = useCreateBudgetMutation();
+  const [createReconciliation] = useCreateReconciliationMutation();
+  const [autoMatch] = useAutoMatchReconciliationMutation();
 
   const stats = [
     { label: 'Budget Heads', value: budgets.length, icon: ChartPie, tone: 'text-blue-700 bg-blue-50' },
@@ -114,11 +100,10 @@ export default function FinanceCompliance() {
                   return;
                 }
                 try {
-                  await createBudgetApi({ financialYear: year, category: budgetForm.category, budgetedAmount: Number(budgetForm.budgetedAmount) });
+                  await createBudget({ financialYear: year, category: budgetForm.category, budgetedAmount: Number(budgetForm.budgetedAmount) }).unwrap();
                   setBudgetForm({ category: '', budgetedAmount: '' });
                   setFormError('');
-                  load();
-                } catch (err) { showToast('error', err.message || 'Failed to save budget'); }
+                } catch (err) { showToast('error', err?.data?.message || 'Failed to save budget'); }
               }}
             >Save</button>
           </div>
@@ -160,12 +145,17 @@ export default function FinanceCompliance() {
                 setFormError('Reconciliation date, reference and positive amount are required');
                 return;
               }
-              await createReconciliationApi({ ...reconForm, amount: Number(reconForm.amount) });
-              setReconForm({ date: '', reference: '', amount: '', type: 'credit' });
-              setFormError('');
-              load();
+              try {
+                await createReconciliation({ ...reconForm, amount: Number(reconForm.amount) }).unwrap();
+                setReconForm({ date: '', reference: '', amount: '', type: 'credit' });
+                setFormError('');
+              } catch (err) { showToast('error', err?.data?.message || 'Failed to add entry'); }
             }}>Add Entry</button>
-            <button className="px-3 py-2 bg-gray-900 hover:bg-black text-white text-sm rounded-lg font-medium transition-colors" onClick={async () => { await autoMatchReconciliationApi(); load(); }}>Auto Match</button>
+            <button className="px-3 py-2 bg-gray-900 hover:bg-black text-white text-sm rounded-lg font-medium transition-colors" onClick={async () => {
+              try {
+                await autoMatch().unwrap();
+              } catch (err) { showToast('error', err?.data?.message || 'Failed to auto match'); }
+            }}>Auto Match</button>
           </div>
           <ul className="space-y-2 max-h-48 overflow-auto pr-1">
             {recon.map((item) => (
