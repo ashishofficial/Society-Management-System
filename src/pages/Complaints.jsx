@@ -5,7 +5,12 @@ import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../context/AuthContext';
-import { createComplaintApi, deleteComplaintApi, listComplaintsApi, updateComplaintStatusApi } from '../services/complaintService';
+import {
+  useGetComplaintsQuery,
+  useCreateComplaintMutation,
+  useUpdateComplaintStatusMutation,
+  useDeleteComplaintMutation,
+} from '../store/apiSlice';
 
 const statusConfig = {
   open: { label: 'Open', color: 'bg-red-100 text-red-700', icon: AlertCircle },
@@ -21,7 +26,6 @@ const priorityConfig = {
 };
 
 export default function Complaints() {
-  const [records, setRecords] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -31,11 +35,15 @@ export default function Complaints() {
   const { toast, showToast, clearToast } = useToast();
   const { user } = useAuth();
 
+  // RTK Query: data is fetched & cached automatically; mutations invalidate the cache to refetch.
+  const { data: records = [], isLoading, error } = useGetComplaintsQuery();
+  const [createComplaint] = useCreateComplaintMutation();
+  const [updateComplaintStatus] = useUpdateComplaintStatusMutation();
+  const [deleteComplaint] = useDeleteComplaintMutation();
+
   useEffect(() => {
-    listComplaintsApi()
-      .then((data) => setRecords(Array.isArray(data) ? data : []))
-      .catch((err) => showToast('error', err.message || 'Failed to load complaints'));
-  }, []);
+    if (error) showToast('error', error?.data?.message || 'Failed to load complaints');
+  }, [error, showToast]);
 
   const stats = useMemo(() => ({
     total: records.length,
@@ -128,14 +136,14 @@ export default function Complaints() {
                 <select
                   className="text-xs border rounded-md px-2 py-1"
                   value={c.status}
-                  onChange={(e) =>
-                    updateComplaintStatusApi(complaintId, e.target.value)
-                      .then((updated) => {
-                        setRecords((prev) => prev.map((x) => ((x._id || x.id) === complaintId ? updated : x)));
-                        showToast('success', 'Complaint status updated');
-                      })
-                      .catch((err) => showToast('error', err.message || 'Failed to update status'))
-                  }
+                  onChange={async (e) => {
+                    try {
+                      await updateComplaintStatus({ id: complaintId, status: e.target.value }).unwrap();
+                      showToast('success', 'Complaint status updated');
+                    } catch (err) {
+                      showToast('error', err?.data?.message || 'Failed to update status');
+                    }
+                  }}
                 >
                   {Object.entries(statusConfig).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                 </select>
@@ -182,14 +190,14 @@ export default function Complaints() {
                   <select
                     className="text-xs border rounded-md px-2 py-1"
                     value={c.status}
-                    onChange={(e) =>
-                      updateComplaintStatusApi(complaintId, e.target.value)
-                        .then((updated) => {
-                          setRecords((prev) => prev.map((x) => ((x._id || x.id) === complaintId ? updated : x)));
-                          showToast('success', 'Complaint status updated');
-                        })
-                        .catch((err) => showToast('error', err.message || 'Failed to update status'))
-                    }
+                    onChange={async (e) => {
+                      try {
+                        await updateComplaintStatus({ id: complaintId, status: e.target.value }).unwrap();
+                        showToast('success', 'Complaint status updated');
+                      } catch (err) {
+                        showToast('error', err?.data?.message || 'Failed to update status');
+                      }
+                    }}
                   >
                     {Object.entries(statusConfig).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                   </select>
@@ -208,7 +216,10 @@ export default function Complaints() {
         </div>
       </div>
 
-      {filtered.length === 0 && (
+      {isLoading && (
+        <div className="text-center py-12 text-gray-400">Loading complaints…</div>
+      )}
+      {!isLoading && filtered.length === 0 && (
         <div className="text-center py-12 text-gray-400">
           <MessageSquareWarning className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p className="text-lg font-medium">No complaints found</p>
@@ -232,13 +243,13 @@ export default function Complaints() {
             showToast('error', 'Please enter the flat number');
             return;
           }
-          createComplaintApi(payload)
-            .then((created) => {
-              setRecords((prev) => [created, ...prev]);
+          createComplaint(payload)
+            .unwrap()
+            .then(() => {
               setForm({ flat: '', subject: '', category: '', priority: 'medium', description: '' });
               showToast('success', 'Complaint created');
             })
-            .catch((err) => showToast('error', err.message || 'Failed to create complaint'))
+            .catch((err) => showToast('error', err?.data?.message || 'Failed to create complaint'))
             .finally(() => setShowModal(false));
         }}>
           <div>
@@ -290,12 +301,10 @@ export default function Complaints() {
             onClick={() => {
               const id = deleteTarget?.id;
               if (!id) return;
-              deleteComplaintApi(id)
-                .then(() => {
-                  setRecords((prev) => prev.filter((x) => (x._id || x.id) !== id));
-                  showToast('success', 'Complaint deleted');
-                })
-                .catch((err) => showToast('error', err.message || 'Failed to delete complaint'))
+              deleteComplaint(id)
+                .unwrap()
+                .then(() => showToast('success', 'Complaint deleted'))
+                .catch((err) => showToast('error', err?.data?.message || 'Failed to delete complaint'))
                 .finally(() => setDeleteTarget(null));
             }}
             className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
