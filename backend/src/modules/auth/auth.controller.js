@@ -35,7 +35,7 @@ export const register = asyncHandler(async (req, res) => {
   if (!name || !email || !password) {
     throw new ApiError(400, 'name, email and password are required');
   }
-  if (!EMAIL_RE.test(email)) throw new ApiError(400, 'A valid email is required');
+  if (typeof email !== 'string' || !EMAIL_RE.test(email)) throw new ApiError(400, 'A valid email is required');
   if (String(password).length < 8) {
     throw new ApiError(400, 'password must be at least 8 characters');
   }
@@ -60,7 +60,7 @@ export const register = asyncHandler(async (req, res) => {
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
+  if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
     throw new ApiError(400, 'email and password are required');
   }
 

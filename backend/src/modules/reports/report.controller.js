@@ -2,6 +2,7 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { Payment } from '../payments/payment.model.js';
 import { Expense } from '../expenses/expense.model.js';
 import { Member } from '../members/member.model.js';
+import { safeYearMonth } from '../../utils/validators.js';
 
 // Build a list of the last N month keys (YYYY-MM), oldest first, ending at `endMonth`.
 function lastNMonths(endMonth, n) {
@@ -48,7 +49,7 @@ export const collectionTrend = asyncHandler(async (req, res) => {
 
 // Expenses grouped by category for a month — drives the breakdown (pie/bar) chart.
 export const expenseBreakdown = asyncHandler(async (req, res) => {
-  const month = req.query.month || new Date().toISOString().slice(0, 7);
+  const month = safeYearMonth(req.query.month, new Date().toISOString().slice(0, 7));
   const expenses = await Expense.find({ societyId: req.societyId, date: { $regex: `^${month}` } });
 
   const byCategory = new Map();

@@ -22,8 +22,18 @@ function scrub(value) {
   return value;
 }
 
+// Keys a client must never set on a write — tenant scope and document identity are always
+// assigned server-side. Stripping them globally neutralizes cross-tenant mass-assignment via
+// findOneAndUpdate(filter, req.body) regardless of which controller forgot to whitelist.
+const FORBIDDEN_BODY_KEYS = ['societyId', '_id'];
+
 export function sanitizeMongo(req, _res, next) {
-  if (req.body) scrub(req.body);
+  if (req.body) {
+    scrub(req.body);
+    if (typeof req.body === 'object' && !Array.isArray(req.body)) {
+      for (const key of FORBIDDEN_BODY_KEYS) delete req.body[key];
+    }
+  }
   if (req.query) scrub(req.query);
   if (req.params) scrub(req.params);
   next();

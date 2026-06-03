@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { BackupRecord, DeviceToken, SocietySetting } from './product.model.js';
@@ -44,7 +45,7 @@ export const triggerBackup = asyncHandler(async (req, res) => {
     societyId: req.societyId,
     type: req.body.type || 'manual',
     status: 'completed',
-    fileUrl: `https://storage.clave.local/${req.societyId}/backup-${Date.now()}.zip`,
+    fileUrl: `https://storage.clave.local/${req.societyId}/backup-${randomUUID()}.zip`,
     notes: 'Backup generated successfully',
   });
   req.auditEntity = 'backup';

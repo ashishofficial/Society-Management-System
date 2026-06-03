@@ -10,7 +10,7 @@ function getSlaDueDate(priority = 'medium') {
 }
 
 export const listComplaints = asyncHandler(async (req, res) => {
-  const data = await Complaint.find({ societyId: req.societyId }).sort({ createdAt: -1 });
+  const data = await Complaint.find({ societyId: req.societyId }).sort({ createdAt: -1 }).limit(5000);
   res.json({ data });
 });
 

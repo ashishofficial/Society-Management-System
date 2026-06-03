@@ -22,11 +22,17 @@ export const createPoll = asyncHandler(async (req, res) => {
 });
 
 export const voteInPoll = asyncHandler(async (req, res) => {
-  const { flat, optionIndex } = req.body;
+  const { optionIndex } = req.body;
   const poll = await Poll.findOne({ _id: req.params.id, ...filterBySociety(req) });
   if (!poll) throw new ApiError(404, 'Poll not found');
   if (poll.isClosed) throw new ApiError(400, 'Poll is closed');
-  if (!flat || typeof optionIndex !== 'number') throw new ApiError(400, 'flat and optionIndex are required');
+
+  // A resident can only vote as their own flat; management may pass an explicit flat.
+  const flat = req.user.role === 'member' ? req.user.flatNumber : req.body.flat;
+  if (!flat) throw new ApiError(400, 'flat is required');
+  if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= poll.options.length) {
+    throw new ApiError(400, 'optionIndex is out of range');
+  }
 
   poll.votes = poll.votes.filter((v) => v.flat !== flat);
   poll.votes.push({ flat, optionIndex });
@@ -66,12 +72,15 @@ export const createEvent = asyncHandler(async (req, res) => {
 });
 
 export const rsvpEvent = asyncHandler(async (req, res) => {
-  const { flat, residentName, status } = req.body;
+  const { residentName, status } = req.body;
   const event = await SocietyEvent.findOne({ _id: req.params.id, ...filterBySociety(req) });
   if (!event) throw new ApiError(404, 'Event not found');
+  // Residents RSVP only as their own flat.
+  const flat = req.user.role === 'member' ? req.user.flatNumber : req.body.flat;
   if (!flat || !residentName) throw new ApiError(400, 'flat and residentName are required');
+  const allowedStatus = ['yes', 'no', 'maybe'].includes(status) ? status : 'yes';
   event.rsvps = event.rsvps.filter((r) => !(r.flat === flat && r.residentName === residentName));
-  event.rsvps.push({ flat, residentName, status: status || 'yes' });
+  event.rsvps.push({ flat, residentName, status: allowedStatus });
   await event.save();
   req.auditEntity = 'event';
   req.auditAction = 'rsvp';

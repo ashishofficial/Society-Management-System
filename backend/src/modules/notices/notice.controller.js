@@ -3,7 +3,7 @@ import { ApiError } from '../../utils/ApiError.js';
 import { Notice } from './notice.model.js';
 
 export const listNotices = asyncHandler(async (req, res) => {
-  const data = await Notice.find({ societyId: req.societyId }).sort({ pinned: -1, date: -1, createdAt: -1 });
+  const data = await Notice.find({ societyId: req.societyId }).sort({ pinned: -1, date: -1, createdAt: -1 }).limit(2000);
   res.json({ data });
 });
 

@@ -48,20 +48,20 @@ const navSections = [
     label: 'Community',
     links: [
       { to: '/members', label: 'Members', icon: Users, roles: ['admin', 'accountant'] },
-      { to: '/visitors', label: 'Visitors', icon: UserCheck, roles: ['admin', 'accountant', 'member'] },
+      { to: '/visitors', label: 'Visitors', icon: UserCheck, roles: ['admin', 'accountant'] },
     ],
   },
   {
     label: 'Communication',
     links: [
       { to: '/notices', label: 'Notices', icon: Bell, roles: ['admin', 'accountant', 'member'] },
-      { to: '/complaints', label: 'Complaints', icon: MessageSquareWarning, roles: ['admin', 'accountant', 'member'] },
+      { to: '/complaints', label: 'Complaints', icon: MessageSquareWarning, roles: ['admin', 'accountant'] },
     ],
   },
   {
     label: null,
     links: [
-      { to: '/facilities', label: 'Facility Booking', icon: CalendarDays, roles: ['admin', 'accountant', 'member'] },
+      { to: '/facilities', label: 'Facility Booking', icon: CalendarDays, roles: ['admin', 'accountant'] },
       { to: '/operations', label: 'Operations', icon: ShieldCheck, roles: ['admin', 'accountant'] },
       { to: '/finance-compliance', label: 'Finance Compliance', icon: Landmark, roles: ['admin', 'accountant'] },
       { to: '/governance', label: 'Governance', icon: Vote, roles: ['admin', 'accountant'] },

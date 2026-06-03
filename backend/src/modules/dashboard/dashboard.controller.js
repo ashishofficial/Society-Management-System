@@ -1,9 +1,10 @@
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { Expense } from '../expenses/expense.model.js';
 import { Payment } from '../payments/payment.model.js';
+import { safeYearMonth } from '../../utils/validators.js';
 
 export const getDashboardSummary = asyncHandler(async (req, res) => {
-  const month = req.query.month || new Date().toISOString().slice(0, 7);
+  const month = safeYearMonth(req.query.month, new Date().toISOString().slice(0, 7));
   const payments = await Payment.find({ societyId: req.societyId, month });
   const expenses = await Expense.find({ societyId: req.societyId, date: { $regex: `^${month}` } });
 

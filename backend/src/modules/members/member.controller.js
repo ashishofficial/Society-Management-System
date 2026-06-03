@@ -3,7 +3,7 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ApiError } from '../../utils/ApiError.js';
 
 export const listMembers = asyncHandler(async (req, res) => {
-  const members = await Member.find({ societyId: req.societyId }).sort({ flatNumber: 1 });
+  const members = await Member.find({ societyId: req.societyId }).sort({ flatNumber: 1 }).limit(5000);
   res.json({ data: members });
 });
 

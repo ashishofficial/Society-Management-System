@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Bell, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { isLiveMode } from '../../config/appMode';
 import { listNotificationsApi, markAllNotificationsReadApi, markNotificationReadApi } from '../../services/notificationService';
 
 const pageTitles = {

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { Payment } from './payment.model.js';
@@ -17,7 +18,7 @@ function getLateDays(targetMonth) {
 export const listPayments = asyncHandler(async (req, res) => {
   const { month } = req.query;
   const filter = month ? { societyId: req.societyId, month } : { societyId: req.societyId };
-  const data = await Payment.find(filter).populate('memberId', 'name flatNumber phone').sort({ month: -1, createdAt: -1 });
+  const data = await Payment.find(filter).populate('memberId', 'name flatNumber phone').sort({ month: -1, createdAt: -1 }).limit(5000);
   res.json({ data });
 });
 
@@ -69,7 +70,7 @@ export const markPaymentPaid = asyncHandler(async (req, res) => {
   payment.paidAmount = nextPaidAmount;
   payment.paidDate = paidDate || new Date().toISOString().split('T')[0];
   payment.paymentMode = paymentMode || 'upi';
-  payment.transactionRef = transactionRef || `TXN-${Date.now()}`;
+  payment.transactionRef = transactionRef || `TXN-${randomUUID().slice(0, 12).toUpperCase()}`;
   payment.status = nextStatus;
   payment.updatedBy = req.user.id;
   await payment.save();
@@ -153,7 +154,7 @@ export const createPaymentLink = asyncHandler(async (req, res) => {
   if (!payment) throw new ApiError(404, 'Payment not found');
 
   const pendingAmount = Math.max((payment.totalDue || 0) - (payment.paidAmount || 0), 0);
-  const reference = `PAY-${payment._id.toString().slice(-6)}-${Date.now()}`;
+  const reference = `PAY-${payment._id.toString().slice(-6)}-${randomUUID().slice(0, 8).toUpperCase()}`;
   const paymentLink = `${env.paymentGatewayBaseUrl}?amount=${pendingAmount}&ref=${reference}&society=${encodeURIComponent(req.societyId)}`;
 
   req.auditEntity = 'payment';

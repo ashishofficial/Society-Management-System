@@ -25,6 +25,7 @@ import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { attachSocietyContext } from './middlewares/society.js';
 import { auditLogger } from './middlewares/auditLogger.js';
 import { sanitizeMongo } from './middlewares/sanitize.js';
+import { rateLimit } from './middlewares/rateLimit.js';
 
 const app = express();
 
@@ -35,6 +36,9 @@ app.use(sanitizeMongo);
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(attachSocietyContext);
 app.use(auditLogger);
+
+// Global per-IP throttle as a baseline DoS guard (login has its own tighter limiter).
+app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 300 }));
 
 app.get('/health', (req, res) => {
   res.json({ ok: true, service: 'clave-society-backend' });

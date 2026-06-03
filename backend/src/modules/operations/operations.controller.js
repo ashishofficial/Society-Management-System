@@ -96,9 +96,17 @@ export const listEmergencyAlerts = asyncHandler(async (req, res) => {
 });
 
 export const createEmergencyAlert = asyncHandler(async (req, res) => {
-  const { flat, raisedBy } = req.body;
+  const { flat, raisedBy, type, notes } = req.body;
   if (!flat || !raisedBy) throw new ApiError(400, 'flat and raisedBy are required');
-  const data = await EmergencyAlert.create({ ...req.body, societyId: req.societyId });
+  // Whitelist fields and force the initial status — an alert can't be created pre-'closed'.
+  const data = await EmergencyAlert.create({
+    societyId: req.societyId,
+    flat,
+    raisedBy,
+    type,
+    notes,
+    status: 'open',
+  });
   req.auditEntity = 'emergency_alert';
   req.auditAction = 'create';
   req.auditEntityId = data._id.toString();
