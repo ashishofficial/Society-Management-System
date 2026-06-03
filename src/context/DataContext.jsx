@@ -175,6 +175,9 @@ export function DataProvider({ children }) {
       isOwner: member.isOwner,
       familyMembers: Number(member.familyMembers || 1),
       status: 'active',
+      // Optional: also provision a resident login linked to this flat.
+      createLogin: Boolean(member.createLogin),
+      loginPassword: member.createLogin ? member.loginPassword : undefined,
     });
     setMembers((prev) => [...prev, normalizeMember(created)]);
     return created;

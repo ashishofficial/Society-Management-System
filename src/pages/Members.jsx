@@ -13,6 +13,8 @@ const emptyForm = {
   isOwner: true,
   familyMembers: 2,
   moveInDate: '',
+  createLogin: false,
+  loginPassword: '',
 };
 export default function Members() {
   const { members, addMember, isLoading, loadError, reloadData } = useData();
@@ -44,6 +46,10 @@ export default function Members() {
     }
     if (!isValidEmail(form.email)) {
       setFormError('Enter a valid email address');
+      return;
+    }
+    if (form.createLogin && (!form.loginPassword || form.loginPassword.length < 8)) {
+      setFormError('Login password must be at least 8 characters');
       return;
     }
     try {
@@ -393,6 +399,38 @@ export default function Members() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
+          </div>
+
+          {/* Optional resident login */}
+          <div className="border-t border-gray-100 pt-4">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.createLogin}
+                onChange={(e) => updateForm('createLogin', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Create a login for this resident
+            </label>
+            {form.createLogin && (
+              <div className="mt-3">
+                <label htmlFor="member-login-password" className="block text-sm font-medium text-gray-700 mb-1">
+                  Login Password
+                </label>
+                <input
+                  id="member-login-password"
+                  type="password"
+                  value={form.loginPassword}
+                  onChange={(e) => updateForm('loginPassword', e.target.value)}
+                  placeholder="Min 8 characters"
+                  autoComplete="new-password"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  The resident signs in with their email{form.email ? ` (${form.email})` : ''} and this password.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

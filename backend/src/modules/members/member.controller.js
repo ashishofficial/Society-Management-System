@@ -1,4 +1,6 @@
+import bcrypt from 'bcryptjs';
 import { Member } from './member.model.js';
+import { User } from '../users/user.model.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ApiError } from '../../utils/ApiError.js';
 
@@ -8,14 +10,40 @@ export const listMembers = asyncHandler(async (req, res) => {
 });
 
 export const createMember = asyncHandler(async (req, res) => {
-  const { flatNumber, name, phone, email, isOwner, familyMembers, status } = req.body;
+  const { flatNumber, name, phone, email, isOwner, familyMembers, status, createLogin, loginPassword } = req.body;
   if (!flatNumber || !name) throw new ApiError(400, 'flatNumber and name are required');
 
+  // Validate the optional resident-login fields BEFORE creating the member (avoid orphan records).
+  if (createLogin) {
+    if (!email) throw new ApiError(400, 'Email is required to create a resident login');
+    if (!loginPassword || String(loginPassword).length < 8) {
+      throw new ApiError(400, 'Login password must be at least 8 characters');
+    }
+    const existingUser = await User.findOne({ email: String(email).toLowerCase() });
+    if (existingUser) throw new ApiError(409, 'A login with this email already exists');
+  }
+
   const member = await Member.create({ societyId: req.societyId, flatNumber, name, phone, email, isOwner, familyMembers, status });
+
+  let loginCreated = false;
+  if (createLogin) {
+    const passwordHash = await bcrypt.hash(String(loginPassword), 10);
+    await User.create({
+      name,
+      email: String(email).toLowerCase(),
+      passwordHash,
+      role: 'member',
+      societyId: req.societyId,
+      memberId: member._id,
+      flatNumber: member.flatNumber,
+    });
+    loginCreated = true;
+  }
+
   req.auditEntity = 'member';
   req.auditAction = 'create';
   req.auditEntityId = member._id.toString();
-  res.status(201).json({ data: member });
+  res.status(201).json({ data: member, loginCreated });
 });
 
 export const updateMember = asyncHandler(async (req, res) => {
