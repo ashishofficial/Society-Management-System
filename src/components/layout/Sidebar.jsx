@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Landmark,
   Vote,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import societyConfig from '../../config/society';
@@ -25,6 +26,8 @@ const navSections = [
     label: null,
     links: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'accountant', 'member'] },
+      { to: '/my-flat', label: 'My Flat', icon: Home, roles: ['member'] },
+      { to: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'accountant'] },
     ],
   },
   {
@@ -111,11 +114,13 @@ function SidebarContent({ onClose, isMobile }) {
               </p>
             )}
             <div className="space-y-0.5">
-              {visibleLinks.map(({ to, label, icon: Icon }) => (
+              {visibleLinks.map((link) => {
+                const LinkIcon = link.icon;
+                return (
                 <NavLink
-                  key={to}
-                  to={to}
-                  end={to === '/'}
+                  key={link.to}
+                  to={link.to}
+                  end={link.to === '/'}
                   onClick={onClose}
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
@@ -125,10 +130,11 @@ function SidebarContent({ onClose, isMobile }) {
                     }`
                   }
                 >
-                  <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-                  {label}
+                  <LinkIcon className="w-[18px] h-[18px] flex-shrink-0" />
+                  {link.label}
                 </NavLink>
-              ))}
+                );
+              })}
             </div>
           </div>
         )})}

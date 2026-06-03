@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BellRing, CalendarDays, Megaphone, Vote } from 'lucide-react';
 import Toast from '../components/common/Toast';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/useToast';
 import {
   closePollApi,
@@ -15,8 +16,17 @@ import {
   votePollApi,
 } from '../services/governanceService';
 
+// Demo fallback only: the demo member login isn't linked to a flat the way a live member is.
+const MEMBER_FLAT_BY_EMAIL = {
+  'member@clave.demo': 'A-101',
+};
+
 export default function GovernanceHub() {
+  const { user } = useAuth();
   const { toast, showToast, clearToast } = useToast();
+  // Prefer the authenticated user's real flat; never silently attribute votes to a fixed flat.
+  const actorFlat = user?.flatNumber || MEMBER_FLAT_BY_EMAIL[user?.email] || MEMBER_FLAT_BY_EMAIL[user?.username] || '';
+  const actorName = user?.name || 'Resident';
   const [polls, setPolls] = useState([]);
   const [events, setEvents] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
@@ -58,15 +68,18 @@ export default function GovernanceHub() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {stats.map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="bg-white border border-gray-100 rounded-xl p-4">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${tone}`}>
-              <Icon className="w-5 h-5" />
+        {stats.map((stat) => {
+          const StatIcon = stat.icon;
+          return (
+          <div key={stat.label} className="bg-white border border-gray-100 rounded-xl p-4">
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${stat.tone}`}>
+              <StatIcon className="w-5 h-5" />
             </div>
-            <p className="text-xs text-gray-500 mt-3">{label}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+            <p className="text-xs text-gray-500 mt-3">{stat.label}</p>
+            <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -90,7 +103,7 @@ export default function GovernanceHub() {
                   </span>
                 </div>
                 <div className="flex gap-2 mt-2">
-                  {!poll.isClosed && <button className="text-xs px-2 py-1 bg-green-100 hover:bg-green-200 rounded transition-colors" onClick={async () => { await votePollApi(poll._id, { flat: 'A-101', optionIndex: 0 }); load(); }}>Vote Yes</button>}
+                  {!poll.isClosed && <button className="text-xs px-2 py-1 bg-green-100 hover:bg-green-200 rounded transition-colors" onClick={async () => { if (!actorFlat) { showToast('error', 'Only residents linked to a flat can vote'); return; } await votePollApi(poll._id, { flat: actorFlat, optionIndex: 0 }); load(); }}>Vote Yes</button>}
                   {!poll.isClosed && <button className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors" onClick={async () => { await closePollApi(poll._id); load(); }}>Close</button>}
                 </div>
               </li>
@@ -115,7 +128,7 @@ export default function GovernanceHub() {
                   <p className="text-sm font-medium text-gray-800">{event.title}</p>
                   <p className="text-xs text-gray-500">{event.date}</p>
                 </div>
-                <button className="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 rounded transition-colors" onClick={async () => { await rsvpEventApi(event._id, { flat: 'A-101', residentName: 'Resident', status: 'yes' }); load(); }}>
+                <button className="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 rounded transition-colors" onClick={async () => { if (!actorFlat) { showToast('error', 'Only residents linked to a flat can RSVP'); return; } await rsvpEventApi(event._id, { flat: actorFlat, residentName: actorName, status: 'yes' }); load(); }}>
                   RSVP
                 </button>
               </li>

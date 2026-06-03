@@ -5,29 +5,57 @@ import { ApiError } from '../../utils/ApiError.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { env } from '../../config/env.js';
 
+const ASSIGNABLE_ROLES = ['admin', 'accountant', 'member'];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function signToken(user) {
-  return jwt.sign({ sub: user._id.toString(), role: user.role }, env.jwtSecret, {
-    expiresIn: env.jwtExpiresIn,
-  });
+  return jwt.sign(
+    { sub: user._id.toString(), role: user.role, societyId: user.societyId },
+    env.jwtSecret,
+    { expiresIn: env.jwtExpiresIn }
+  );
 }
 
+function publicUser(user) {
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    societyId: user.societyId,
+    flatNumber: user.flatNumber || null,
+  };
+}
+
+// Creating accounts is an admin-only action (route is guarded by requireAuth + requireRole('admin')).
+// The new user always inherits the creating admin's societyId, so an admin can never provision
+// accounts into another tenant, and roles are restricted to the known set.
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, memberId, flatNumber } = req.body;
   if (!name || !email || !password) {
     throw new ApiError(400, 'name, email and password are required');
   }
+  if (!EMAIL_RE.test(email)) throw new ApiError(400, 'A valid email is required');
+  if (String(password).length < 8) {
+    throw new ApiError(400, 'password must be at least 8 characters');
+  }
+  const assignedRole = role && ASSIGNABLE_ROLES.includes(role) ? role : 'member';
 
   const exists = await User.findOne({ email: email.toLowerCase() });
   if (exists) throw new ApiError(409, 'Email already exists');
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({ name, email, passwordHash, role: role || 'admin' });
-  const token = signToken(user);
-
-  res.status(201).json({
-    token,
-    user: { id: user._id, name: user.name, email: user.email, role: user.role },
+  const user = await User.create({
+    name,
+    email,
+    passwordHash,
+    role: assignedRole,
+    societyId: req.user.societyId,
+    memberId: assignedRole === 'member' ? memberId || null : null,
+    flatNumber: assignedRole === 'member' ? flatNumber || null : null,
   });
+
+  res.status(201).json({ user: publicUser(user) });
 });
 
 export const login = asyncHandler(async (req, res) => {
@@ -43,10 +71,7 @@ export const login = asyncHandler(async (req, res) => {
   if (!match) throw new ApiError(401, 'Invalid credentials');
 
   const token = signToken(user);
-  res.json({
-    token,
-    user: { id: user._id, name: user.name, email: user.email, role: user.role },
-  });
+  res.json({ token, user: publicUser(user) });
 });
 
 export const me = asyncHandler(async (req, res) => {

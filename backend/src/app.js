@@ -19,15 +19,19 @@ import financeRoutes from './modules/finance/finance.routes.js';
 import governanceRoutes from './modules/governance/governance.routes.js';
 import productRoutes from './modules/product/product.routes.js';
 import notificationRoutes from './modules/notifications/notification.routes.js';
+import portalRoutes from './modules/portal/portal.routes.js';
+import reportRoutes from './modules/reports/report.routes.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { attachSocietyContext } from './middlewares/society.js';
 import { auditLogger } from './middlewares/auditLogger.js';
+import { sanitizeMongo } from './middlewares/sanitize.js';
 
 const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: env.corsOrigin }));
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
+app.use(sanitizeMongo);
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(attachSocietyContext);
 app.use(auditLogger);
@@ -52,6 +56,8 @@ app.use('/api/v1/finance', financeRoutes);
 app.use('/api/v1/governance', governanceRoutes);
 app.use('/api/v1/product', productRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/portal', portalRoutes);
+app.use('/api/v1/reports', reportRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

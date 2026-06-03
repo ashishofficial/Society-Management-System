@@ -4,6 +4,7 @@ import { formatDate } from '../utils/formatDate';
 import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
+import { useAuth } from '../context/AuthContext';
 import { createComplaintApi, deleteComplaintApi, listComplaintsApi, updateComplaintStatusApi } from '../services/complaintService';
 
 const statusConfig = {
@@ -26,8 +27,9 @@ export default function Complaints() {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ subject: '', category: '', priority: 'medium', description: '' });
+  const [form, setForm] = useState({ flat: '', subject: '', category: '', priority: 'medium', description: '' });
   const { toast, showToast, clearToast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     listComplaintsApi()
@@ -219,22 +221,30 @@ export default function Complaints() {
         <form className="space-y-4" onSubmit={(e) => {
           e.preventDefault();
           const payload = {
-            flat: 'A-101',
-            residentName: 'Resident',
+            flat: (form.flat || user?.flatNumber || '').trim(),
+            residentName: user?.name || 'Resident',
             subject: form.subject,
             category: form.category,
             priority: form.priority,
             description: form.description,
           };
+          if (!payload.flat) {
+            showToast('error', 'Please enter the flat number');
+            return;
+          }
           createComplaintApi(payload)
             .then((created) => {
               setRecords((prev) => [created, ...prev]);
-              setForm({ subject: '', category: '', priority: 'medium', description: '' });
+              setForm({ flat: '', subject: '', category: '', priority: 'medium', description: '' });
               showToast('success', 'Complaint created');
             })
             .catch((err) => showToast('error', err.message || 'Failed to create complaint'))
             .finally(() => setShowModal(false));
         }}>
+          <div>
+            <label htmlFor="complaint-flat" className="block text-sm font-medium text-gray-700 mb-1">Flat Number</label>
+            <input id="complaint-flat" type="text" value={form.flat} onChange={(e) => setForm((p) => ({ ...p, flat: e.target.value }))} placeholder="e.g. A-101" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+          </div>
           <div>
             <label htmlFor="complaint-subject" className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
             <input id="complaint-subject" type="text" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))} placeholder="Brief description of the issue" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required />

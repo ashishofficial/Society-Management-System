@@ -5,7 +5,8 @@ import { createExpense, deleteExpense, listExpenses, updateExpense } from './exp
 const router = Router();
 router.use(requireAuth);
 
-router.get('/', listExpenses);
+// Expense ledger is management-only financial data.
+router.get('/', requireRole('admin', 'accountant'), listExpenses);
 router.post('/', requireRole('admin', 'accountant'), createExpense);
 router.patch('/:id', requireRole('admin', 'accountant'), updateExpense);
 router.delete('/:id', requireRole('admin'), deleteExpense);

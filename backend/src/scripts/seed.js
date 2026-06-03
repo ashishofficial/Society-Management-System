@@ -68,9 +68,9 @@ async function seed() {
   });
 
   const [adminUser, accountantUser, memberUser] = await User.insertMany([
-    { name: 'RWA Admin', email: ADMIN_EMAIL, passwordHash, role: 'admin' },
-    { name: 'Finance Manager', email: ACCOUNTANT_EMAIL, passwordHash: accountantHash, role: 'accountant' },
-    { name: 'Resident User', email: MEMBER_EMAIL, passwordHash: memberHash, role: 'member' },
+    { name: 'RWA Admin', email: ADMIN_EMAIL, passwordHash, role: 'admin', societyId: SOCIETY_ID },
+    { name: 'Finance Manager', email: ACCOUNTANT_EMAIL, passwordHash: accountantHash, role: 'accountant', societyId: SOCIETY_ID },
+    { name: 'Resident User', email: MEMBER_EMAIL, passwordHash: memberHash, role: 'member', societyId: SOCIETY_ID },
   ]);
 
   const members = await Member.insertMany([
@@ -80,6 +80,11 @@ async function seed() {
     { societyId: SOCIETY_ID, flatNumber: 'C-301', name: 'Neha Arora', phone: '9876543213', email: 'neha@gmail.com', familyMembers: 5, isOwner: true },
     { societyId: SOCIETY_ID, flatNumber: 'C-302', name: 'Karan Mehta', phone: '9876543214', email: 'karan@gmail.com', familyMembers: 1, isOwner: false },
   ]);
+
+  // Link the demo resident login to flat A-101 so the member portal can scope "my flat" data.
+  memberUser.memberId = members[0]._id;
+  memberUser.flatNumber = members[0].flatNumber;
+  await memberUser.save();
 
   await Payment.insertMany([
     { societyId: SOCIETY_ID, memberId: members[0]._id, month: CURRENT_MONTH, amount: 3500, totalDue: 3500, paidAmount: 3500, status: 'paid', paidDate: `${CURRENT_MONTH}-03`, paymentMode: 'upi', transactionRef: 'UPI-1001', updatedBy: adminUser._id },

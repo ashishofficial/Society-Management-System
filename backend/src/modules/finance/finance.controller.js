@@ -15,8 +15,8 @@ function getFinancialYearMonths(financialYear) {
 
 export const createBudget = asyncHandler(async (req, res) => {
   const { financialYear, category, budgetedAmount } = req.body;
-  if (!financialYear || !category || typeof budgetedAmount !== 'number') {
-    throw new ApiError(400, 'financialYear, category and budgetedAmount are required');
+  if (!financialYear || !category || !Number.isFinite(budgetedAmount) || budgetedAmount < 0) {
+    throw new ApiError(400, 'financialYear, category and a non-negative budgetedAmount are required');
   }
   const data = await BudgetPlan.findOneAndUpdate(
     { societyId: req.societyId, financialYear, category },
@@ -43,11 +43,8 @@ export const getBudgetVariance = asyncHandler(async (req, res) => {
   if (!financialYear) throw new ApiError(400, 'financialYear query is required');
 
   const budgets = await BudgetPlan.find({ societyId: req.societyId, financialYear });
-  const startYear = Number(financialYear.split('-')[0]);
-  const months = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(startYear, 3 + i, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const months = getFinancialYearMonths(financialYear);
+  if (!months) throw new ApiError(400, 'Invalid financialYear format');
   const regex = `^(${months.join('|')})`;
   const expenses = await Expense.find({ societyId: req.societyId, date: { $regex: regex } });
 
@@ -67,10 +64,19 @@ export const getBudgetVariance = asyncHandler(async (req, res) => {
 
 export const createReconciliationEntry = asyncHandler(async (req, res) => {
   const { date, reference, amount, type } = req.body;
-  if (!date || !reference || typeof amount !== 'number' || !type) {
-    throw new ApiError(400, 'date, reference, amount and type are required');
+  if (!date || !reference || !Number.isFinite(amount) || amount < 0 || !type) {
+    throw new ApiError(400, 'date, reference, a non-negative amount and type are required');
   }
-  const data = await ReconciliationEntry.create({ ...req.body, societyId: req.societyId });
+  // Whitelist — a client must not be able to pre-mark an entry as matched or forge matchedPaymentId.
+  const data = await ReconciliationEntry.create({
+    societyId: req.societyId,
+    date,
+    reference,
+    amount,
+    type,
+    status: 'unmatched',
+    matchedPaymentId: null,
+  });
   req.auditEntity = 'reconciliation';
   req.auditAction = 'create';
   req.auditEntityId = data._id.toString();
@@ -93,17 +99,28 @@ export const listReconciliationEntries = asyncHandler(async (req, res) => {
 
 export const autoMatchReconciliation = asyncHandler(async (req, res) => {
   const entries = await ReconciliationEntry.find({ societyId: req.societyId, status: 'unmatched' });
+  // Payments already linked to a matched entry must not be reused, otherwise two bank entries
+  // with the same reference/amount both claim the same payment (double-counted reconciliation).
+  const alreadyMatched = await ReconciliationEntry.find({
+    societyId: req.societyId,
+    status: 'matched',
+    matchedPaymentId: { $ne: null },
+  }).select('matchedPaymentId');
+  const usedPaymentIds = alreadyMatched.map((e) => e.matchedPaymentId).filter(Boolean);
+
   let matched = 0;
   for (const entry of entries) {
     const payment = await Payment.findOne({
       societyId: req.societyId,
       transactionRef: entry.reference,
       paidAmount: entry.amount,
+      _id: { $nin: usedPaymentIds },
     });
     if (payment) {
       entry.status = 'matched';
       entry.matchedPaymentId = payment._id;
       await entry.save();
+      usedPaymentIds.push(payment._id);
       matched += 1;
     }
   }

@@ -137,25 +137,25 @@ export const markNotificationRead = asyncHandler(async (req, res) => {
 
 export async function streamNotifications(req, res) {
   try {
-    const tokenFromQuery = typeof req.query.token === 'string' ? req.query.token : '';
+    // Header-only: never accept the JWT via the query string (it would leak into access logs,
+    // proxy logs and browser history). Clients must send Authorization: Bearer <token>.
     const authHeader = req.headers.authorization || '';
-    const tokenFromHeader = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-    const token = tokenFromQuery || tokenFromHeader;
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
     if (!token) {
       res.status(401).json({ message: 'Missing token' });
       return;
     }
 
-    const payload = jwt.verify(token, env.jwtSecret);
-    const user = await User.findById(payload.sub).select('_id');
+    const payload = jwt.verify(token, env.jwtSecret, { algorithms: ['HS256'] });
+    const user = await User.findById(payload.sub).select('_id societyId');
     if (!user) {
       res.status(401).json({ message: 'Invalid token user' });
       return;
     }
 
-    const societyId = (typeof req.query.societyId === 'string' && req.query.societyId.trim())
-      ? req.query.societyId.trim()
-      : (req.societyId || 'default');
+    // SECURITY: tenant comes from the authenticated user, never the client-supplied query string.
+    // (This route runs before requireAuth, so it must resolve the tenant itself.)
+    const societyId = user.societyId || 'default';
     const userId = user._id.toString();
 
     res.setHeader('Content-Type', 'text/event-stream');

@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import societyConfig from '../config/society';
+import { isLiveMode } from '../config/appMode';
+import { createDemoDataset } from '../data/demoData';
 import { listMembersApi, createMemberApi, updateMemberApi } from '../services/memberService';
 import { listExpensesApi, createExpenseApi, deleteExpenseApi } from '../services/expenseService';
 import { listPaymentsApi, markPaymentPaidApi } from '../services/paymentService';
@@ -57,8 +59,37 @@ export function DataProvider({ children }) {
     };
   };
 
-  const reloadData = async () => {
-    if (!localStorage.getItem('auth_token')) return;
+  const loadDemoData = useCallback(() => {
+    const demo = createDemoDataset();
+    setMembers(demo.members);
+    setExpenses(demo.expenses);
+    setPayments(demo.payments);
+    setLoadError('');
+    setIsLoading(false);
+  }, []);
+
+  const reloadData = useCallback(async () => {
+    if (!isLiveMode) {
+      loadDemoData();
+      return;
+    }
+    if (!localStorage.getItem('auth_token')) {
+      setMembers([]);
+      setExpenses([]);
+      setPayments([]);
+      return;
+    }
+    // Residents can't read the society-wide member/payment lists (management-only endpoints);
+    // they get their own data from the portal pages, so skip these fetches to avoid 403s.
+    let role = '';
+    try { role = JSON.parse(localStorage.getItem('auth_user') || '{}')?.role || ''; } catch { role = ''; }
+    if (role === 'member') {
+      setMembers([]);
+      setExpenses([]);
+      setPayments([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setLoadError('');
     try {
@@ -74,13 +105,28 @@ export function DataProvider({ children }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [loadDemoData]);
 
   useEffect(() => {
     reloadData();
-  }, []);
+  }, [reloadData]);
 
   const addExpense = async (expense) => {
+    if (!isLiveMode) {
+      const created = {
+        id: `demo-e-${Date.now()}`,
+        date: expense.date,
+        category: expense.category,
+        description: expense.description,
+        amount: Number(expense.amount),
+        paidTo: expense.paidTo,
+        paymentMode: expense.paymentMode || 'upi',
+        receiptNumber: expense.receiptNumber || '',
+        addedBy: 'admin',
+      };
+      setExpenses((prev) => [created, ...prev]);
+      return created;
+    }
     const created = await createExpenseApi({
       date: expense.date,
       category: expense.category,
@@ -95,11 +141,32 @@ export function DataProvider({ children }) {
   };
 
   const deleteExpense = async (id) => {
+    if (!isLiveMode) {
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+      return;
+    }
     await deleteExpenseApi(id);
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   };
 
   const addMember = async (member) => {
+    if (!isLiveMode) {
+      const created = {
+        id: `demo-m-${Date.now()}`,
+        flatNumber: member.flatNumber,
+        block: (member.flatNumber || '').split('-')[0] || 'A',
+        name: member.name,
+        phone: member.phone || '',
+        email: member.email || '',
+        isOwner: member.isOwner ?? true,
+        familyMembers: Number(member.familyMembers || 1),
+        status: 'active',
+        role: 'Member',
+        isCommitteeMember: false,
+      };
+      setMembers((prev) => [...prev, created]);
+      return created;
+    }
     const created = await createMemberApi({
       flatNumber: member.flatNumber,
       name: member.name,
@@ -114,6 +181,10 @@ export function DataProvider({ children }) {
   };
 
   const updateMember = async (id, updates) => {
+    if (!isLiveMode) {
+      setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)));
+      return updates;
+    }
     const updated = await updateMemberApi(id, updates);
     const normalized = normalizeMember(updated);
     setMembers((prev) => prev.map((m) => (m.id === id ? normalized : m)));
@@ -121,6 +192,21 @@ export function DataProvider({ children }) {
   };
 
   const markAsPaid = async (paymentId, paymentDetails) => {
+    if (!isLiveMode) {
+      setPayments((prev) => prev.map((p) => {
+        if (p.id !== paymentId) return p;
+        const paidAmount = Number(paymentDetails.paidAmount ?? p.totalDue);
+        return {
+          ...p,
+          paidAmount,
+          status: paidAmount >= p.totalDue ? 'paid' : 'partial',
+          paidDate: paymentDetails.paidDate || new Date().toISOString().slice(0, 10),
+          paymentMode: paymentDetails.paymentMode || p.paymentMode,
+          transactionRef: paymentDetails.transactionRef || p.transactionRef,
+        };
+      }));
+      return paymentDetails;
+    }
     const updated = await markPaymentPaidApi(paymentId, paymentDetails);
     const normalized = normalizePayment(updated);
     setPayments((prev) => prev.map((p) => (p.id === paymentId ? { ...p, ...normalized } : p)));
@@ -131,9 +217,10 @@ export function DataProvider({ children }) {
 
   const getMonthlyStats = (month) => {
     const monthPayments = getPaymentsForMonth(month);
-    const totalDue = monthPayments.length * societyConfig.monthlyMaintenance;
-    const totalCollected = monthPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.paidAmount, 0)
-      + monthPayments.filter(p => p.status === 'partial').reduce((s, p) => s + p.paidAmount, 0);
+    // Use each payment's own totalDue (which includes late fees) rather than a flat rate,
+    // otherwise Total Due / Pending / Collection Rate are wrong whenever fees apply.
+    const totalDue = monthPayments.reduce((s, p) => s + (p.totalDue ?? p.amount ?? societyConfig.monthlyMaintenance), 0);
+    const totalCollected = monthPayments.reduce((s, p) => s + (p.paidAmount || 0), 0);
     const totalPending = totalDue - totalCollected;
     const paidCount = monthPayments.filter(p => p.status === 'paid').length;
     const overdueCount = monthPayments.filter(p => p.status === 'overdue').length;

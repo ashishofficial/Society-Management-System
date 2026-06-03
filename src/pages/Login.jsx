@@ -18,7 +18,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import societyConfig from '../config/society';
 
-const isLiveMode = import.meta.env.VITE_APP_MODE === 'live';
+import { isLiveMode } from '../config/appMode';
 const adminCreds = societyConfig.demoCredentials.admin;
 const memberCreds = societyConfig.demoCredentials.member;
 const canQuickLoginAdmin = Boolean(adminCreds.username && adminCreds.password);
@@ -104,16 +104,19 @@ export default function Login() {
           <p className="text-blue-200 text-base mb-10">{societyConfig.productTagline}</p>
 
           <div className="grid grid-cols-2 gap-4 max-w-lg w-full">
-            {features.map(({ icon: Icon, title, desc }) => (
+            {features.map((feature) => {
+              const FeatureIcon = feature.icon;
+              return (
               <div
-                key={title}
+                key={feature.title}
                 className="bg-white/8 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/12 transition-colors"
               >
-                <Icon className="w-7 h-7 text-blue-300 mb-2" />
-                <h3 className="text-white font-semibold text-sm mb-1">{title}</h3>
-                <p className="text-blue-300/80 text-xs leading-relaxed">{desc}</p>
+                <FeatureIcon className="w-7 h-7 text-blue-300 mb-2" />
+                <h3 className="text-white font-semibold text-sm mb-1">{feature.title}</h3>
+                <p className="text-blue-300/80 text-xs leading-relaxed">{feature.desc}</p>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Company branding */}

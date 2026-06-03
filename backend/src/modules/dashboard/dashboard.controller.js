@@ -8,9 +8,9 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
   const expenses = await Expense.find({ societyId: req.societyId, date: { $regex: `^${month}` } });
 
   const totalDue = payments.reduce((s, p) => s + (p.totalDue || p.amount || 0), 0);
-  const totalCollected = payments
-    .filter((p) => p.status === 'paid' || p.status === 'partial')
-    .reduce((s, p) => s + (p.paidAmount || 0), 0);
+  // Sum paidAmount across all statuses: applyLateFees can flip a partially-paid record to
+  // 'overdue', so filtering by status would drop real money that was already collected.
+  const totalCollected = payments.reduce((s, p) => s + (p.paidAmount || 0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
   const totalPending = totalDue - totalCollected;
   const paidCount = payments.filter((p) => p.status === 'paid').length;

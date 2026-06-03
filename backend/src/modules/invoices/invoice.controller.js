@@ -5,6 +5,12 @@ import { ApiError } from '../../utils/ApiError.js';
 
 export const getInvoiceByFlatAndMonth = asyncHandler(async (req, res) => {
   const { flatNumber, month } = req.params;
+
+  // A resident may only view their own flat's invoice; management roles can view any flat.
+  if (req.user.role === 'member' && req.user.flatNumber !== flatNumber) {
+    throw new ApiError(403, 'You can only view invoices for your own flat');
+  }
+
   const member = await Member.findOne({ societyId: req.societyId, flatNumber });
   if (!member) throw new ApiError(404, 'Member not found');
 

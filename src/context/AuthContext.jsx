@@ -1,9 +1,9 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import societyConfig from '../config/society';
+import { isLiveMode } from '../config/appMode';
 import { getCurrentUser, loginWithApi, clearAuthToken } from '../services/authService';
 
 const AuthContext = createContext(null);
-const isLiveMode = import.meta.env.VITE_APP_MODE === 'live';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -57,6 +57,9 @@ export function AuthProvider({ children }) {
 
       if (configuredUsername === username && configuredPassword === password) {
         const userData = { username, role: creds[key].role, name: creds[key].name };
+        // Demo residents aren't linked to a flat server-side; pin one so flat-scoped demo
+        // features (My Flat, governance voting/RSVP) work without a backend.
+        if (creds[key].role === 'member') userData.flatNumber = 'A-101';
         setUser(userData);
         return { success: true };
       }

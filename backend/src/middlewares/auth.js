@@ -9,8 +9,8 @@ export async function requireAuth(req, res, next) {
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) throw new ApiError(401, 'Missing bearer token');
 
-    const payload = jwt.verify(token, env.jwtSecret);
-    const user = await User.findById(payload.sub).select('_id name email role');
+    const payload = jwt.verify(token, env.jwtSecret, { algorithms: ['HS256'] });
+    const user = await User.findById(payload.sub).select('_id name email role societyId memberId flatNumber');
     if (!user) throw new ApiError(401, 'Invalid token user');
 
     req.user = {
@@ -18,7 +18,13 @@ export async function requireAuth(req, res, next) {
       name: user.name,
       email: user.email,
       role: user.role,
+      societyId: user.societyId,
+      memberId: user.memberId ? user.memberId.toString() : null,
+      flatNumber: user.flatNumber || null,
     };
+    // SECURITY: tenant scope comes from the authenticated user, never the client-supplied
+    // x-society-id header. This overrides whatever attachSocietyContext set as a fallback.
+    req.societyId = user.societyId;
     next();
   } catch (error) {
     next(error.statusCode ? error : new ApiError(401, 'Unauthorized'));

@@ -11,7 +11,8 @@ const router = Router();
 router.use(requireAuth);
 
 router.get('/', listFacilities);
-router.get('/bookings', listFacilityBookings);
+// The full booking list (all flats) is management-only.
+router.get('/bookings', requireRole('admin', 'accountant'), listFacilityBookings);
 router.post('/bookings', createFacilityBooking);
 router.patch('/bookings/:id/status', requireRole('admin', 'accountant'), updateFacilityBookingStatus);
 

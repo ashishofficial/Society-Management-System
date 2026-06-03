@@ -15,15 +15,26 @@ export const listComplaints = asyncHandler(async (req, res) => {
 });
 
 export const createComplaint = asyncHandler(async (req, res) => {
-  const { flat, subject, description, category, residentName } = req.body;
+  const { flat, subject, description, category, residentName, priority } = req.body;
   if (!flat || !subject || !description || !category || !residentName) {
     throw new ApiError(400, 'flat, subject, description, category and residentName are required');
   }
+  // Whitelist fields — never spread req.body. Workflow fields (status, escalated, assignedTo,
+  // resolvedDate) are server-controlled, and a resident can only file against their own flat.
+  const complaintFlat = req.user.role === 'member' ? (req.user.flatNumber || flat) : flat;
+  const allowedPriority = ['low', 'medium', 'high'].includes(priority) ? priority : 'medium';
   const complaint = await Complaint.create({
-    ...req.body,
     societyId: req.societyId,
-    date: req.body.date || new Date().toISOString().split('T')[0],
-    slaDueDate: req.body.slaDueDate || getSlaDueDate(req.body.priority),
+    flat: complaintFlat,
+    subject,
+    description,
+    category,
+    residentName,
+    priority: allowedPriority,
+    status: 'open',
+    escalated: false,
+    date: new Date().toISOString().split('T')[0],
+    slaDueDate: getSlaDueDate(allowedPriority),
   });
   req.auditEntity = 'complaint';
   req.auditAction = 'create';

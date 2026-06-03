@@ -9,6 +9,15 @@ for (const key of required) {
   }
 }
 
+// A weak or placeholder JWT secret lets anyone forge tokens for any user/tenant. Refuse to start
+// with a known-bad secret outside development.
+const WEAK_SECRET = /^(change-me|secret|changeme|password|test|default)/i;
+if (process.env.NODE_ENV === 'production') {
+  if (process.env.JWT_SECRET.length < 32 || WEAK_SECRET.test(process.env.JWT_SECRET)) {
+    throw new Error('JWT_SECRET must be a strong, non-default value (>=32 chars) in production');
+  }
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 5000),

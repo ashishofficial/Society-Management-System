@@ -42,15 +42,18 @@ export default function ProductSettings() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {stats.map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="bg-white border border-gray-100 rounded-xl p-4">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${tone}`}>
-              <Icon className="w-5 h-5" />
+        {stats.map((stat) => {
+          const StatIcon = stat.icon;
+          return (
+          <div key={stat.label} className="bg-white border border-gray-100 rounded-xl p-4">
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${stat.tone}`}>
+              <StatIcon className="w-5 h-5" />
             </div>
-            <p className="text-xs text-gray-500 mt-3">{label}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+            <p className="text-xs text-gray-500 mt-3">{stat.label}</p>
+            <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {settings && (

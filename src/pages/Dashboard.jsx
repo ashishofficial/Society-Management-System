@@ -97,15 +97,19 @@ function CSSBarChart({ data }) {
 
 function CSSDonutChart({ data }) {
   const total = data.reduce((s, d) => s + d.value, 0);
-  if (total === 0) return <div className="h-[250px] flex items-center justify-center text-gray-400">No data</div>;
+  const segments = useMemo(() => {
+    if (total === 0) return [];
+    const sorted = [...data].sort((a, b) => b.value - a.value);
+    let start = 0;
+    return sorted.map((d) => {
+      const percent = (d.value / total) * 100;
+      const segment = { ...d, start, percent };
+      start += percent;
+      return segment;
+    });
+  }, [data, total]);
 
-  let cumulative = 0;
-  const segments = [...data].sort((a, b) => b.value - a.value).map(d => {
-    const start = cumulative;
-    const percent = (d.value / total) * 100;
-    cumulative += percent;
-    return { ...d, start, percent };
-  });
+  if (total === 0) return <div className="h-[250px] flex items-center justify-center text-gray-400">No data</div>;
 
   const gradientParts = segments.map(s => `${s.color} ${s.start}% ${s.start + s.percent}%`).join(', ');
 

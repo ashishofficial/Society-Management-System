@@ -5,7 +5,8 @@ import { requireAuth, requireRole } from '../../middlewares/auth.js';
 const router = Router();
 
 router.use(requireAuth);
-router.get('/', listMembers);
+// Full member directory is management-only; residents use /portal/summary for their own record.
+router.get('/', requireRole('admin', 'accountant'), listMembers);
 router.post('/', requireRole('admin', 'accountant'), createMember);
 router.patch('/:id', requireRole('admin', 'accountant'), updateMember);
 router.delete('/:id', requireRole('admin'), deleteMember);

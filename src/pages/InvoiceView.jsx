@@ -20,7 +20,7 @@ export default function InvoiceView() {
   const payment = invoiceData?.payment || payments.find((p) => p.flatNumber === flatNumber && p.month === month);
 
   useEffect(() => {
-    if ((import.meta.env.VITE_APP_MODE || 'demo') !== 'live') return;
+    if (import.meta.env.VITE_APP_MODE !== 'live') return;
     getInvoiceApi(flatNumber, month).then((data) => setInvoiceData(data)).catch(() => {});
   }, [flatNumber, month]);
 
@@ -31,7 +31,9 @@ export default function InvoiceView() {
   const monthYear = formatMonthYear(month);
 
   const amount = payment?.amount || societyConfig.monthlyMaintenance;
-  const lateFee = payment?.lateFee || 0;
+  // Payments carry totalDue (base + late fee) but no separate lateFee field; derive it so the
+  // invoice itemizes correctly and the total matches what the resident actually owes.
+  const lateFee = payment?.lateFee ?? Math.max((payment?.totalDue ?? amount) - amount, 0);
   const total = amount + lateFee;
 
   const formatDisplayDate = (dateStr) => {

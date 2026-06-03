@@ -5,7 +5,8 @@ import { createVisitor, deleteVisitor, listVisitors, updateVisitor, updateVisito
 const router = Router();
 router.use(requireAuth);
 
-router.get('/', listVisitors);
+// The society-wide visitor log is management-only (reveals who visits which flat).
+router.get('/', requireRole('admin', 'accountant'), listVisitors);
 router.post('/', createVisitor);
 router.patch('/:id/status', requireRole('admin', 'accountant'), updateVisitorStatus);
 router.patch('/:id', requireRole('admin', 'accountant'), updateVisitor);

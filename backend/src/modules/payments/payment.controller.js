@@ -23,8 +23,8 @@ export const listPayments = asyncHandler(async (req, res) => {
 
 export const createPayment = asyncHandler(async (req, res) => {
   const { memberId, month, amount, totalDue } = req.body;
-  if (!memberId || !month || typeof amount !== 'number' || typeof totalDue !== 'number') {
-    throw new ApiError(400, 'memberId, month, amount and totalDue are required');
+  if (!memberId || !month || !Number.isFinite(amount) || !Number.isFinite(totalDue) || amount < 0 || totalDue < 0) {
+    throw new ApiError(400, 'memberId, month and non-negative numeric amount/totalDue are required');
   }
 
   const payment = await Payment.create({
@@ -49,8 +49,22 @@ export const markPaymentPaid = asyncHandler(async (req, res) => {
   const payment = await Payment.findOne({ _id: id, societyId: req.societyId });
   if (!payment) throw new ApiError(404, 'Payment not found');
 
-  const nextPaidAmount = Number(paidAmount ?? payment.totalDue);
+  const nextPaidAmount = paidAmount === undefined || paidAmount === null
+    ? payment.totalDue
+    : Number(paidAmount);
+  // Must be a finite, non-negative number and can't exceed what's owed — otherwise a single
+  // request can inflate society-wide collection totals/reconciliation.
+  if (!Number.isFinite(nextPaidAmount) || nextPaidAmount < 0) {
+    throw new ApiError(400, 'paidAmount must be a non-negative number');
+  }
+  if (nextPaidAmount > payment.totalDue) {
+    throw new ApiError(400, 'paidAmount cannot exceed the amount due');
+  }
   const nextStatus = nextPaidAmount >= payment.totalDue ? 'paid' : 'partial';
+  // Don't let a settled payment be silently downgraded back to 'partial' by a smaller re-submit.
+  if (payment.status === 'paid' && nextStatus !== 'paid') {
+    throw new ApiError(409, 'Payment is already settled and cannot be reduced');
+  }
 
   payment.paidAmount = nextPaidAmount;
   payment.paidDate = paidDate || new Date().toISOString().split('T')[0];

@@ -28,11 +28,20 @@ export const createFacilityBooking = asyncHandler(async (req, res) => {
   const facility = await Facility.findOne({ _id: facilityId, societyId: req.societyId });
   if (!facility) throw new ApiError(404, 'Facility not found');
 
+  // Whitelist fields explicitly — never spread req.body. The price comes from the facility
+  // (a client cannot book for ₹0) and bookings always start 'pending' (no self-approval).
+  // Residents may only book under their own flat.
+  const bookingFlat = req.user.role === 'member' ? (req.user.flatNumber || flat) : flat;
   const booking = await FacilityBooking.create({
-    ...req.body,
     societyId: req.societyId,
-    amount: typeof req.body.amount === 'number' ? req.body.amount : facility.pricePerSlot,
-    status: req.body.status || 'pending',
+    facilityId,
+    date,
+    timeSlot,
+    purpose,
+    flat: bookingFlat,
+    residentName,
+    amount: facility.pricePerSlot,
+    status: 'pending',
   });
   req.auditEntity = 'facility_booking';
   req.auditAction = 'create';
