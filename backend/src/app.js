@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -22,12 +23,25 @@ import notificationRoutes from './modules/notifications/notification.routes.js';
 import portalRoutes from './modules/portal/portal.routes.js';
 import reportRoutes from './modules/reports/report.routes.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
+import { connectDb } from './config/db.js';
 import { attachSocietyContext } from './middlewares/society.js';
 import { auditLogger } from './middlewares/auditLogger.js';
 import { sanitizeMongo } from './middlewares/sanitize.js';
 import { rateLimit } from './middlewares/rateLimit.js';
 
 const app = express();
+
+let dbConnectPromise = null;
+function ensureDatabase() {
+  if (mongoose.connection.readyState === 1) return Promise.resolve();
+  if (!dbConnectPromise) {
+    dbConnectPromise = connectDb().catch((err) => {
+      dbConnectPromise = null;
+      throw err;
+    });
+  }
+  return dbConnectPromise;
+}
 
 app.use(helmet());
 app.use(cors({ origin: env.corsOrigin }));
@@ -36,6 +50,15 @@ app.use(sanitizeMongo);
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(attachSocietyContext);
 app.use(auditLogger);
+
+app.use(async (req, res, next) => {
+  try {
+    await ensureDatabase();
+    next();
+  } catch {
+    res.status(503).json({ message: 'Database connection unavailable' });
+  }
+});
 
 // Global per-IP throttle as a baseline DoS guard (login has its own tighter limiter).
 app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 300 }));

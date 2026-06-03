@@ -1,15 +1,11 @@
 import app from './app.js';
-import { connectDb } from './config/db.js';
 import { env } from './config/env.js';
 
-async function bootstrap() {
-  await connectDb();
+// Local development only — Vercel uses the default export from app.js.
+if (!process.env.VERCEL) {
   app.listen(env.port, () => {
     console.log(`API running on http://localhost:${env.port}`);
   });
 }
 
-bootstrap().catch((err) => {
-  console.error('Failed to start server', err);
-  process.exit(1);
-});
+export default app;
