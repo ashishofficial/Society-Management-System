@@ -13,16 +13,11 @@ import {
   Shield,
   MessageSquare,
   CalendarDays,
-  LogIn,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import societyConfig from '../config/society';
 
 import { isLiveMode } from '../config/appMode';
-const adminCreds = societyConfig.demoCredentials.admin;
-const memberCreds = societyConfig.demoCredentials.member;
-const canQuickLoginAdmin = Boolean(adminCreds.username && adminCreds.password);
-const canQuickLoginMember = Boolean(memberCreds.username && memberCreds.password);
 
 const features = [
   { icon: BarChart3, title: 'Real-time Dashboard', desc: 'Track collections, expenses & financials at a glance' },
@@ -58,26 +53,6 @@ export default function Login() {
       setError(result.error);
       setShake(true);
       setTimeout(() => setShake(false), 500);
-    }
-    setLoading(false);
-  };
-
-  const handleQuickLogin = async (role) => {
-    const creds = societyConfig.demoCredentials[role];
-    if (!creds?.username || !creds?.password) {
-      setError('Set login credentials in .env (VITE_ADMIN_EMAIL / VITE_ADMIN_PASSWORD)');
-      return;
-    }
-    setUsername(creds.username);
-    setPassword(creds.password);
-    setError('');
-    setLoading(true);
-
-    await new Promise((r) => setTimeout(r, 600));
-
-    const result = await login(creds.username, creds.password);
-    if (result.success) {
-      navigate('/');
     }
     setLoading(false);
   };
@@ -142,42 +117,6 @@ export default function Login() {
           <p className="text-gray-500 text-sm text-center mb-8">
             Sign in to manage {societyConfig.name}
           </p>
-
-          {(canQuickLoginAdmin || canQuickLoginMember) && (
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {canQuickLoginAdmin && (
-                <button
-                  onClick={() => handleQuickLogin('admin')}
-                  disabled={loading}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-70 shadow-sm"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Login as Admin
-                </button>
-              )}
-              {canQuickLoginMember && (
-                <button
-                  onClick={() => handleQuickLogin('member')}
-                  disabled={loading}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-70 border border-gray-200 shadow-sm"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Login as Member
-                </button>
-              )}
-            </div>
-          )}
-
-          {(canQuickLoginAdmin || canQuickLoginMember) && (
-            <div className="relative mb-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-3 bg-gray-50 text-gray-400">or sign in manually</span>
-              </div>
-            </div>
-          )}
 
           {/* Form */}
           <form
