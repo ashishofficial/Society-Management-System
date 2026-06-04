@@ -25,7 +25,7 @@ const navSections = [
   {
     label: null,
     links: [
-      { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'accountant', 'member'] },
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'accountant'] },
       { to: '/my-flat', label: 'My Flat', icon: Home, roles: ['member'] },
       { to: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'accountant'] },
     ],
