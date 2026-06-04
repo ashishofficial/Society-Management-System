@@ -26,6 +26,13 @@ export async function apiRequest(path, options = {}) {
   });
 
   if (!response.ok) {
+    // Session expired/invalid mid-use (had a token but server says 401): clear it and let the
+    // app redirect to login instead of leaving every page stuck on "Request failed".
+    if (response.status === 401 && localStorage.getItem('auth_token')) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('society_id');
+      window.dispatchEvent(new Event('auth:unauthorized'));
+    }
     let errorMessage = `Request failed with status ${response.status}`;
     try {
       const data = await response.json();

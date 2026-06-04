@@ -12,12 +12,23 @@ export const listExpenses = asyncHandler(async (req, res) => {
 });
 
 export const createExpense = asyncHandler(async (req, res) => {
-  const { date, category, description, amount, paidTo } = req.body;
-  if (!date || !category || !description || typeof amount !== 'number' || !paidTo) {
-    throw new ApiError(400, 'date, category, description, amount and paidTo are required');
+  const { date, category, description, amount, paidTo, paymentMode, receiptNumber } = req.body;
+  if (!date || !category || !description || !Number.isFinite(amount) || amount < 0 || !paidTo) {
+    throw new ApiError(400, 'date, category, description, a non-negative amount and paidTo are required');
   }
 
-  const expense = await Expense.create({ ...req.body, societyId: req.societyId, addedBy: req.user.id });
+  // Whitelist fields (never spread req.body) so a client can't inject addedBy/societyId/etc.
+  const expense = await Expense.create({
+    societyId: req.societyId,
+    date,
+    category,
+    description,
+    amount,
+    paidTo,
+    paymentMode,
+    receiptNumber,
+    addedBy: req.user.id,
+  });
   req.auditEntity = 'expense';
   req.auditAction = 'create';
   req.auditEntityId = expense._id.toString();

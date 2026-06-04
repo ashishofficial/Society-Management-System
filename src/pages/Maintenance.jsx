@@ -44,6 +44,7 @@ export default function Maintenance() {
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState('upi');
   const [transactionRef, setTransactionRef] = useState('');
+  const [markError, setMarkError] = useState('');
 
   const payments = getPaymentsForMonth(currentMonth);
   const stats = getMonthlyStats(currentMonth);
@@ -71,6 +72,7 @@ export default function Maintenance() {
   // Open mark-paid modal
   const openMarkPaid = (payment) => {
     setSelectedPayment(payment);
+    setMarkError('');
     // Prefill the full amount owed (base + any late fee), not just the base maintenance.
     setPaymentAmount(payment.totalDue ?? payment.amount);
     setPaymentDate(new Date().toISOString().split('T')[0]);
@@ -79,16 +81,21 @@ export default function Maintenance() {
     setShowMarkPaidModal(true);
   };
 
-  const handleConfirmPaid = () => {
+  const handleConfirmPaid = async () => {
     if (!selectedPayment) return;
-    markAsPaid(selectedPayment.id, {
-      paidAmount: paymentAmount,
-      paidDate: paymentDate,
-      paymentMode,
-      transactionRef,
-    });
-    setShowMarkPaidModal(false);
-    setSelectedPayment(null);
+    setMarkError('');
+    try {
+      await markAsPaid(selectedPayment.id, {
+        paidAmount: paymentAmount,
+        paidDate: paymentDate,
+        paymentMode,
+        transactionRef,
+      });
+      setShowMarkPaidModal(false);
+      setSelectedPayment(null);
+    } catch (error) {
+      setMarkError(error?.data?.message || 'Failed to mark payment as paid');
+    }
   };
 
   // WhatsApp link for a single payment
@@ -382,6 +389,8 @@ export default function Maintenance() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               />
             </div>
+
+            {markError && <p className="text-sm text-red-600">{markError}</p>}
 
             {/* Actions */}
             <div className="flex items-center gap-3 pt-2">

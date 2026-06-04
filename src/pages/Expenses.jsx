@@ -127,7 +127,7 @@ export default function Expenses() {
       receiptNumber: formData.receiptNumber || `RCP-${Date.now()}`,
     })
       .then(() => setShowAddModal(false))
-      .catch((error) => setFormErrors((prev) => ({ ...prev, description: error?.message || 'Failed to save expense' })));
+      .catch((error) => setFormErrors((prev) => ({ ...prev, description: error?.data?.message || 'Failed to save expense' })));
   };
 
   const confirmDelete = () => {

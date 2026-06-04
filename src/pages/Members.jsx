@@ -104,7 +104,7 @@ export default function Members() {
       setForm(emptyForm);
       setFormError('');
     } catch (error) {
-      setFormError(error?.message || 'Failed to add member');
+      setFormError(error?.data?.message || 'Failed to add member');
     }
   };
 

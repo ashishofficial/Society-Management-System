@@ -185,7 +185,7 @@ export default function Dashboard() {
 
   const recentActivity = useMemo(() => {
     const paid = payments
-      .filter((p) => p.status === 'paid' && p.paidDate)
+      .filter((p) => (p.status === 'paid' || p.status === 'partial') && p.paidDate)
       .map((p) => ({ type: 'payment', description: `${p.memberName} - Flat ${p.flatNumber}`, amount: p.paidAmount, date: p.paidDate }));
     const exp = expenses.map((e) => ({ type: 'expense', description: e.description, amount: e.amount, date: e.date }));
     return [...paid, ...exp].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);

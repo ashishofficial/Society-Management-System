@@ -15,6 +15,15 @@ import { ApiError } from '../utils/ApiError.js';
 export function rateLimit({ windowMs, max, message = 'Too many requests, please try again later', keyGenerator } = {}) {
   const hits = new Map(); // key -> { count, resetAt }
 
+  // Periodically evict expired buckets so the map doesn't grow unbounded with every unique IP.
+  const sweep = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of hits) {
+      if (now >= entry.resetAt) hits.delete(key);
+    }
+  }, windowMs);
+  if (typeof sweep.unref === 'function') sweep.unref(); // don't keep the process alive
+
   const getKey = keyGenerator || ((req) => req.ip || req.socket?.remoteAddress || 'unknown');
 
   return function rateLimitMiddleware(req, _res, next) {

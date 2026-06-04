@@ -112,7 +112,7 @@ export const api = createApi({
 
     // ---------- Payments ----------
     getPayments: builder.query({ queryFn: (month) => run(payments.listPaymentsApi(month)), providesTags: ['Payment'] }),
-    markPaymentPaid: builder.mutation({ queryFn: ({ id, payload }) => run(payments.markPaymentPaidApi(id, payload)), invalidatesTags: ['Payment'] }),
+    markPaymentPaid: builder.mutation({ queryFn: ({ id, payload }) => run(payments.markPaymentPaidApi(id, payload)), invalidatesTags: ['Payment', 'Compliance'] }),
 
     // ---------- Expenses ----------
     getExpenses: builder.query({ queryFn: (month) => run(expenses.listExpensesApi(month)), providesTags: ['Expense'] }),
@@ -123,7 +123,7 @@ export const api = createApi({
     getMySummary: builder.query({ queryFn: (month) => run(portal.getMySummaryApi(month)), providesTags: ['PortalSummary'] }),
     getMyPayments: builder.query({ queryFn: () => run(portal.getMyPaymentsApi()), providesTags: ['PortalPayment'] }),
     getMyComplaints: builder.query({ queryFn: () => run(portal.getMyComplaintsApi()), providesTags: ['PortalComplaint'] }),
-    createMyComplaint: builder.mutation({ queryFn: (body) => run(portal.createMyComplaintApi(body)), invalidatesTags: ['PortalComplaint'] }),
+    createMyComplaint: builder.mutation({ queryFn: (body) => run(portal.createMyComplaintApi(body)), invalidatesTags: ['PortalComplaint', 'PortalSummary'] }),
 
     // ---------- Notifications ----------
     getNotifications: builder.query({ queryFn: () => run(notifications.listNotificationsApi()), providesTags: ['Notification'] }),

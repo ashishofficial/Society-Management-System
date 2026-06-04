@@ -150,7 +150,7 @@ export default function Facilities() {
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Upcoming & Today</h2>
             <div className="space-y-3">
               {upcomingBookings.map((b) => {
-                const st = bookingStatusConfig[b.status];
+                const st = bookingStatusConfig[b.status] || bookingStatusConfig.pending;
                 const StIcon = st.icon;
                 const bookingId = b._id || b.id;
                 const facilityName = b.facilityId?.name || b.facilityName;
@@ -206,7 +206,7 @@ export default function Facilities() {
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Past Bookings</h2>
             <div className="space-y-3">
               {pastBookings.map((b) => {
-                const st = bookingStatusConfig[b.status];
+                const st = bookingStatusConfig[b.status] || bookingStatusConfig.pending;
                 const StIcon = st.icon;
                 const facilityName = b.facilityId?.name || b.facilityName;
                 return (

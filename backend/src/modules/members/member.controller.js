@@ -101,11 +101,18 @@ export const createMemberLogin = asyncHandler(async (req, res) => {
   res.status(created ? 201 : 200).json({ data: { email: user.email, flatNumber: user.flatNumber, created } });
 });
 
+const MEMBER_UPDATABLE = ['flatNumber', 'name', 'phone', 'email', 'isOwner', 'familyMembers', 'status'];
+
 export const updateMember = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  // Whitelist editable fields so societyId / server-managed fields can't be overwritten.
+  const updates = {};
+  for (const key of MEMBER_UPDATABLE) {
+    if (req.body[key] !== undefined) updates[key] = req.body[key];
+  }
   const member = await Member.findOneAndUpdate(
     { _id: id, societyId: req.societyId },
-    req.body,
+    updates,
     { new: true, runValidators: true }
   );
   if (!member) throw new ApiError(404, 'Member not found');

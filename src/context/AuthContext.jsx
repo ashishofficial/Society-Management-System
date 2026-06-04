@@ -36,6 +36,16 @@ export function AuthProvider({ children }) {
       });
   }, []);
 
+  // Global sign-out when any request hits a 401 (token expired/invalid mid-session).
+  useEffect(() => {
+    const onUnauthorized = () => {
+      clearAuthToken();
+      setUser(null);
+    };
+    window.addEventListener('auth:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', onUnauthorized);
+  }, []);
+
   const login = async (username, password) => {
     if (isLiveMode) {
       const res = await loginWithApi(username, password);
