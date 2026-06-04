@@ -5,6 +5,9 @@ import {
   getMyComplaints,
   createMyComplaint,
   getMyNotices,
+  getMyDocuments,
+  getMyVisitors,
+  preApproveVisitor,
 } from './portal.controller.js';
 import { requireAuth } from '../../middlewares/auth.js';
 
@@ -17,5 +20,8 @@ router.get('/payments', getMyPayments);
 router.get('/complaints', getMyComplaints);
 router.post('/complaints', createMyComplaint);
 router.get('/notices', getMyNotices);
+router.get('/documents', getMyDocuments);
+router.get('/visitors', getMyVisitors);
+router.post('/visitors', preApproveVisitor);
 
 export default router;

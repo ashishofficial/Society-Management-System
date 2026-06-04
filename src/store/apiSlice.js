@@ -35,6 +35,7 @@ export const api = createApi({
     'ProductSettings', 'Backup',
     'Member', 'Payment', 'Expense',
     'PortalSummary', 'PortalPayment', 'PortalComplaint', 'Notification', 'Invoice',
+    'PortalNotice', 'PortalDocument', 'PortalVisitor',
   ],
   endpoints: (builder) => ({
     // ---------- Complaints ----------
@@ -124,6 +125,10 @@ export const api = createApi({
     getMyPayments: builder.query({ queryFn: () => run(portal.getMyPaymentsApi()), providesTags: ['PortalPayment'] }),
     getMyComplaints: builder.query({ queryFn: () => run(portal.getMyComplaintsApi()), providesTags: ['PortalComplaint'] }),
     createMyComplaint: builder.mutation({ queryFn: (body) => run(portal.createMyComplaintApi(body)), invalidatesTags: ['PortalComplaint', 'PortalSummary'] }),
+    getMyNotices: builder.query({ queryFn: () => run(portal.getMyNoticesApi()), providesTags: ['PortalNotice'] }),
+    getMyDocuments: builder.query({ queryFn: () => run(portal.getMyDocumentsApi()), providesTags: ['PortalDocument'] }),
+    getMyVisitors: builder.query({ queryFn: () => run(portal.getMyVisitorsApi()), providesTags: ['PortalVisitor'] }),
+    preApproveVisitor: builder.mutation({ queryFn: (body) => run(portal.preApproveVisitorApi(body)), invalidatesTags: ['PortalVisitor'] }),
 
     // ---------- Notifications ----------
     getNotifications: builder.query({ queryFn: () => run(notifications.listNotificationsApi()), providesTags: ['Notification'] }),
@@ -171,6 +176,7 @@ export const {
   useGetExpensesQuery, useCreateExpenseMutation, useDeleteExpenseMutation,
   // resident portal
   useGetMySummaryQuery, useGetMyPaymentsQuery, useGetMyComplaintsQuery, useCreateMyComplaintMutation,
+  useGetMyNoticesQuery, useGetMyDocumentsQuery, useGetMyVisitorsQuery, usePreApproveVisitorMutation,
   // notifications
   useGetNotificationsQuery, useMarkNotificationReadMutation, useMarkAllNotificationsReadMutation,
   // invoice

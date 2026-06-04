@@ -5,6 +5,10 @@ import { Member } from '../members/member.model.js';
 import { Payment } from '../payments/payment.model.js';
 import { Complaint } from '../complaints/complaint.model.js';
 import { Notice } from '../notices/notice.model.js';
+import { Visitor } from '../visitors/visitor.model.js';
+import { SocietyDocument } from '../operations/operations.model.js';
+
+const gatePassOf = (id) => `GP-${id.toString().slice(-6).toUpperCase()}`;
 
 // Resolve the resident record for the logged-in member account. Every portal endpoint is scoped
 // to this flat, so a member can only ever see/create data for their own unit.
@@ -115,6 +119,42 @@ export const createMyComplaint = asyncHandler(async (req, res) => {
 });
 
 export const getMyNotices = asyncHandler(async (req, res) => {
-  const data = await Notice.find({ societyId: req.societyId }).sort({ pinned: -1, date: -1 });
+  const data = await Notice.find({ societyId: req.societyId }).sort({ pinned: -1, date: -1 }).limit(50);
   res.json({ data });
+});
+
+// Documents the society has shared with members.
+export const getMyDocuments = asyncHandler(async (req, res) => {
+  await resolveMyFlat(req);
+  const data = await SocietyDocument.find({ societyId: req.societyId, visibility: 'members' }).sort({ createdAt: -1 });
+  res.json({ data });
+});
+
+// Visitors expected at / logged for the resident's own flat (with a gate-pass code).
+export const getMyVisitors = asyncHandler(async (req, res) => {
+  const { flatNumber } = await resolveMyFlat(req);
+  const visitors = await Visitor.find({ societyId: req.societyId, flat: flatNumber }).sort({ createdAt: -1 }).limit(100);
+  const data = visitors.map((v) => ({ ...v.toObject(), gatePass: gatePassOf(v._id) }));
+  res.json({ data });
+});
+
+// Resident pre-approves a guest for their own flat; returns a gate-pass code to share.
+export const preApproveVisitor = asyncHandler(async (req, res) => {
+  const { flatNumber } = await resolveMyFlat(req);
+  const { name, purpose, contact, vehicle } = req.body;
+  if (!name || !purpose) throw new ApiError(400, 'name and purpose are required');
+  const visitor = await Visitor.create({
+    societyId: req.societyId,
+    flat: flatNumber, // forced to the resident's own flat
+    name,
+    purpose,
+    contact: contact || null,
+    vehicle: vehicle || null,
+    preApproved: true,
+    status: 'expected',
+  });
+  req.auditEntity = 'visitor';
+  req.auditAction = 'pre_approve';
+  req.auditEntityId = visitor._id.toString();
+  res.status(201).json({ data: { ...visitor.toObject(), gatePass: gatePassOf(visitor._id) } });
 });

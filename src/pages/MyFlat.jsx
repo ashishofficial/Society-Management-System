@@ -1,17 +1,22 @@
 import { useState, useMemo } from 'react';
 import {
   Home, Wallet, AlertCircle, CheckCircle2, Clock, Plus, MessageSquareWarning, Receipt,
+  Bell, FileText, UserCheck, Download, Pin, ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { isLiveMode } from '../config/appMode';
+import societyConfig from '../config/society';
 import { formatCurrency } from '../utils/formatCurrency';
 import { formatDate, formatMonthYear, getCurrentMonth } from '../utils/formatDate';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
 import {
   useGetMySummaryQuery, useGetMyPaymentsQuery, useGetMyComplaintsQuery, useCreateMyComplaintMutation,
+  useGetMyNoticesQuery, useGetMyDocumentsQuery, useGetMyVisitorsQuery, usePreApproveVisitorMutation,
 } from '../store/apiSlice';
 
 const statusStyles = {
@@ -70,9 +75,19 @@ export default function MyFlat() {
   const { data: paymentsLive = [], isLoading: l2 } = useGetMyPaymentsQuery(undefined, { skip: !live });
   const { data: complaintsLive = [], isLoading: l3 } = useGetMyComplaintsQuery(undefined, { skip: !live });
   const [createMyComplaint] = useCreateMyComplaintMutation();
+  const { data: notices = [] } = useGetMyNoticesQuery(undefined, { skip: !live });
+  const { data: documents = [] } = useGetMyDocumentsQuery(undefined, { skip: !live });
+  const { data: visitors = [] } = useGetMyVisitorsQuery(undefined, { skip: !live });
+  const [preApproveVisitor] = usePreApproveVisitorMutation();
 
   const demoView = useMemo(() => (live ? null : deriveDemoView(members, payments)), [live, members, payments]);
   const [demoComplaints, setDemoComplaints] = useState([]);
+
+  // Pay Now (UPI) + visitor pre-approval modal state
+  const [showPay, setShowPay] = useState(false);
+  const [showVisitor, setShowVisitor] = useState(false);
+  const [visitorForm, setVisitorForm] = useState({ name: '', purpose: '', contact: '', vehicle: '' });
+  const [lastGatePass, setLastGatePass] = useState('');
 
   const summary = live ? summaryLive : demoView?.summary;
   const myPayments = live ? paymentsLive : (demoView?.payments || []);
@@ -136,6 +151,61 @@ export default function MyFlat() {
       showToast('error', err?.data?.message || 'Failed to raise complaint');
     } finally {
       reset();
+    }
+  };
+
+  // ---- Pay Now (UPI deep link, no payment gateway needed) ----
+  const payAmount = summary?.currentDue?.pendingAmount || summary?.totalOutstanding || 0;
+  const upiLink = `upi://pay?pa=${encodeURIComponent(societyConfig.upiId || '')}&pn=${encodeURIComponent(societyConfig.name || '')}&am=${payAmount}&cu=INR&tn=${encodeURIComponent(`Maintenance ${summary?.flatNumber || ''}`)}`;
+  const upiQr = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`;
+
+  // ---- Download a payment receipt as PDF ----
+  const downloadReceipt = (p) => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(societyConfig.name || 'Society', 14, 18);
+    doc.setFontSize(11);
+    doc.setTextColor(90);
+    doc.text('Maintenance Payment Receipt', 14, 26);
+    autoTable(doc, {
+      startY: 34,
+      theme: 'grid',
+      body: [
+        ['Flat', summary?.flatNumber || '-'],
+        ['Resident', user?.name || summary?.member?.name || '-'],
+        ['Month', formatMonthYear(p.month)],
+        ['Amount Due', formatCurrency(p.totalDue)],
+        ['Amount Paid', formatCurrency(p.paidAmount)],
+        ['Status', statusStyles[p.status]?.label || p.status],
+        ['Paid On', p.paidDate ? formatDate(p.paidDate) : '-'],
+        ['Payment Mode', p.paymentMode || '-'],
+        ['Reference', p.transactionRef || '-'],
+      ],
+    });
+    doc.save(`receipt-${summary?.flatNumber || 'flat'}-${p.month}.pdf`);
+  };
+
+  // ---- Pre-approve a visitor ----
+  const handlePreApprove = async (e) => {
+    e.preventDefault();
+    if (!visitorForm.name.trim() || !visitorForm.purpose.trim()) {
+      showToast('error', 'Name and purpose are required');
+      return;
+    }
+    if (!live) {
+      const code = `GP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      setLastGatePass(code);
+      setVisitorForm({ name: '', purpose: '', contact: '', vehicle: '' });
+      showToast('success', 'Guest pre-approved (demo)');
+      return;
+    }
+    try {
+      const res = await preApproveVisitor(visitorForm).unwrap();
+      setLastGatePass(res?.gatePass || '');
+      setVisitorForm({ name: '', purpose: '', contact: '', vehicle: '' });
+      showToast('success', 'Guest pre-approved');
+    } catch (err) {
+      showToast('error', err?.data?.message || 'Failed to pre-approve guest');
     }
   };
 
@@ -208,7 +278,7 @@ export default function MyFlat() {
             <p className="text-xs text-blue-700 mt-0.5">Pay before the due date to avoid late fees.</p>
           </div>
           <button
-            onClick={() => showToast('success', 'Online payment integration coming soon')}
+            onClick={() => setShowPay(true)}
             className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg"
           >
             <Wallet className="w-4 h-4" /> Pay Now
@@ -237,6 +307,7 @@ export default function MyFlat() {
                   <th className="px-5 py-3 font-medium">Paid</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3 font-medium">Paid On</th>
+                  <th className="px-5 py-3 font-medium">Receipt</th>
                 </tr>
               </thead>
               <tbody>
@@ -251,6 +322,18 @@ export default function MyFlat() {
                         <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span>
                       </td>
                       <td className="px-5 py-3 text-gray-500">{p.paidDate ? formatDate(p.paidDate) : '-'}</td>
+                      <td className="px-5 py-3">
+                        {(p.status === 'paid' || p.status === 'partial') ? (
+                          <button
+                            onClick={() => downloadReceipt(p)}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
+                          >
+                            <Download className="w-3.5 h-3.5" /> PDF
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -296,6 +379,90 @@ export default function MyFlat() {
         )}
       </div>
 
+      {/* My Visitors */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2"><UserCheck className="w-4 h-4 text-blue-600" /> My Visitors</h2>
+          <button onClick={() => { setLastGatePass(''); setShowVisitor(true); }} className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800">
+            <Plus className="w-3.5 h-3.5" /> Pre-approve Guest
+          </button>
+        </div>
+        {visitors.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <UserCheck className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+            <p className="text-sm font-medium text-gray-500">No visitors yet</p>
+            <p className="text-xs text-gray-400 mt-1">Pre-approve a guest to generate a gate pass.</p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-gray-50">
+            {visitors.map((v) => (
+              <li key={v._id || v.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{v.name}</p>
+                  <p className="text-xs text-gray-500">{v.purpose}{v.vehicle ? ` • ${v.vehicle}` : ''}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  {v.gatePass && <p className="text-xs font-mono font-semibold text-blue-700">{v.gatePass}</p>}
+                  <span className="text-xs text-gray-400 capitalize">{(v.status || 'expected').replace('_', ' ')}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Notices + Documents */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2"><Bell className="w-4 h-4 text-amber-600" /> Latest Notices</h2>
+          </div>
+          {notices.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-gray-400">No notices</div>
+          ) : (
+            <ul className="divide-y divide-gray-50">
+              {notices.slice(0, 5).map((n) => (
+                <li key={n._id || n.id} className="px-5 py-3">
+                  <div className="flex items-start gap-2">
+                    {n.pinned && <Pin className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{n.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.description}</p>
+                      {n.date && <p className="text-xs text-gray-400 mt-1">{formatDate(n.date)}</p>}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2"><FileText className="w-4 h-4 text-indigo-600" /> Documents</h2>
+          </div>
+          {documents.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-gray-400">No documents shared</div>
+          ) : (
+            <ul className="divide-y divide-gray-50">
+              {documents.map((d) => (
+                <li key={d._id || d.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{d.title}</p>
+                    {d.category && <p className="text-xs text-gray-400 capitalize">{d.category}</p>}
+                  </div>
+                  {d.url && (
+                    <a href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 shrink-0">
+                      View <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
       {/* Raise complaint modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Raise a Complaint" size="md">
         <form className="space-y-4" onSubmit={submitComplaint}>
@@ -332,6 +499,77 @@ export default function MyFlat() {
             <button type="submit" className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Submit Complaint</button>
           </div>
         </form>
+      </Modal>
+
+      {/* Pay Now (UPI) modal */}
+      <Modal isOpen={showPay} onClose={() => setShowPay(false)} title="Pay Maintenance" size="sm">
+        <div className="space-y-4 text-center">
+          <div>
+            <p className="text-xs text-gray-500">Amount to pay</p>
+            <p className="text-3xl font-bold text-gray-900">{formatCurrency(payAmount)}</p>
+          </div>
+          {societyConfig.upiId ? (
+            <>
+              <img src={upiQr} alt="UPI QR code" className="mx-auto w-44 h-44 rounded-lg border border-gray-100" />
+              <p className="text-xs text-gray-500">Scan with any UPI app, or</p>
+              <a
+                href={upiLink}
+                className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg"
+              >
+                <Wallet className="w-4 h-4" /> Pay via UPI app
+              </a>
+              <div className="text-left bg-gray-50 rounded-lg p-3 text-sm">
+                <p className="flex justify-between"><span className="text-gray-500">UPI ID</span><span className="font-medium text-gray-800">{societyConfig.upiId}</span></p>
+                <p className="flex justify-between mt-1"><span className="text-gray-500">Account</span><span className="font-medium text-gray-800">{societyConfig.accountNumber}</span></p>
+                <p className="flex justify-between mt-1"><span className="text-gray-500">IFSC</span><span className="font-medium text-gray-800">{societyConfig.ifscCode}</span></p>
+              </div>
+              <p className="text-[11px] text-gray-400">After paying, your records update once the office confirms the transaction.</p>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">Online payment is not configured yet. Please contact the society office.</p>
+          )}
+        </div>
+      </Modal>
+
+      {/* Pre-approve visitor modal */}
+      <Modal isOpen={showVisitor} onClose={() => setShowVisitor(false)} title="Pre-approve a Guest" size="md">
+        {lastGatePass ? (
+          <div className="space-y-4 text-center">
+            <p className="text-sm text-gray-600">Share this gate pass with your guest and the security gate:</p>
+            <div className="bg-blue-50 border border-blue-100 rounded-xl py-6">
+              <p className="text-3xl font-bold tracking-widest font-mono text-blue-700">{lastGatePass}</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => { setLastGatePass(''); setShowVisitor(true); }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Add another</button>
+              <button onClick={() => setShowVisitor(false)} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Done</button>
+            </div>
+          </div>
+        ) : (
+          <form className="space-y-4" onSubmit={handlePreApprove}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="visitor-name" className="block text-sm font-medium text-gray-700 mb-1">Guest Name</label>
+                <input id="visitor-name" type="text" value={visitorForm.name} onChange={(e) => setVisitorForm((p) => ({ ...p, name: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+              </div>
+              <div>
+                <label htmlFor="visitor-purpose" className="block text-sm font-medium text-gray-700 mb-1">Purpose</label>
+                <input id="visitor-purpose" type="text" value={visitorForm.purpose} onChange={(e) => setVisitorForm((p) => ({ ...p, purpose: e.target.value }))} placeholder="e.g. Guest, Delivery" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+              </div>
+              <div>
+                <label htmlFor="visitor-contact" className="block text-sm font-medium text-gray-700 mb-1">Contact (optional)</label>
+                <input id="visitor-contact" type="tel" value={visitorForm.contact} onChange={(e) => setVisitorForm((p) => ({ ...p, contact: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label htmlFor="visitor-vehicle" className="block text-sm font-medium text-gray-700 mb-1">Vehicle (optional)</label>
+                <input id="visitor-vehicle" type="text" value={visitorForm.vehicle} onChange={(e) => setVisitorForm((p) => ({ ...p, vehicle: e.target.value }))} placeholder="e.g. DL10AB1234" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setShowVisitor(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button type="submit" className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Generate Gate Pass</button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       <Toast toast={toast} onClose={clearToast} />
