@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react';
 import { Bell, Boxes, Settings2, ShieldCheck } from 'lucide-react';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
-import { registerDeviceTokenApi } from '../services/productService';
 import {
   useGetProductSettingsQuery,
   useUpdateProductSettingsMutation,
   useGetBackupsQuery,
   useTriggerBackupMutation,
+  useRegisterDeviceTokenMutation,
 } from '../store/apiSlice';
 
 export default function ProductSettings() {
   const { toast, showToast, clearToast } = useToast();
   const [settings, setSettings] = useState(null);
   const [token, setToken] = useState('');
+  const [registerDeviceToken] = useRegisterDeviceTokenMutation();
 
   // RTK Query: data is fetched & cached automatically; mutations invalidate the cache to refetch.
   const { data: settingsData } = useGetProductSettingsQuery();
@@ -92,7 +93,7 @@ export default function ProductSettings() {
         </div>
         <div className="flex gap-2">
           <input value={token} onChange={(e) => setToken(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="device-token-xyz" />
-          <button className="px-3 py-2 bg-gray-900 hover:bg-black text-white text-sm rounded-lg font-medium transition-colors" onClick={async () => { await registerDeviceTokenApi({ token, platform: 'web' }); setToken(''); showToast('success', 'Device token registered'); }}>
+          <button className="px-3 py-2 bg-gray-900 hover:bg-black text-white text-sm rounded-lg font-medium transition-colors" onClick={async () => { try { await registerDeviceToken({ token, platform: 'web' }).unwrap(); setToken(''); showToast('success', 'Device token registered'); } catch (err) { showToast('error', err?.data?.message || 'Failed to register device token'); } }}>
             Register
           </button>
         </div>

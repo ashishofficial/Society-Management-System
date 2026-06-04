@@ -3,7 +3,11 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Bell, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { listNotificationsApi, markAllNotificationsReadApi, markNotificationReadApi } from '../../services/notificationService';
+import {
+  useGetNotificationsQuery,
+  useMarkNotificationReadMutation,
+  useMarkAllNotificationsReadMutation,
+} from '../../store/apiSlice';
 
 const pageTitles = {
   '/': 'Dashboard',
@@ -27,9 +31,17 @@ export default function Topbar({ onMenuClick }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [notificationData, setNotificationData] = useState({ unreadCount: 0, items: [] });
-  const [notificationLoading, setNotificationLoading] = useState(false);
   const panelRef = useRef(null);
+
+  const hasAuthToken = Boolean(localStorage.getItem('auth_token'));
+  const { data, isFetching, refetch } = useGetNotificationsQuery(undefined, {
+    skip: !hasAuthToken,
+    pollingInterval: 5000,
+  });
+  const [markRead] = useMarkNotificationReadMutation();
+  const [markAllRead] = useMarkAllNotificationsReadMutation();
+  const notificationData = data || { unreadCount: 0, items: [] };
+  const notificationLoading = isFetching;
 
   const initials = user?.name
     ?.split(' ')
@@ -52,41 +64,15 @@ export default function Topbar({ onMenuClick }) {
   const hasUnread = notificationData.unreadCount > 0;
   const unreadLabel = notificationData.unreadCount > 99 ? '99+' : String(notificationData.unreadCount || 0);
   const groupedItems = useMemo(() => notificationData.items.slice(0, 8), [notificationData.items]);
-  const hasAuthToken = Boolean(localStorage.getItem('auth_token'));
 
   const closeNotifications = () => setNotificationOpen(false);
 
   const openNotifications = () => {
     setNotificationOpen(true);
-    if (hasAuthToken) loadNotifications({ withLoading: true });
+    if (hasAuthToken) refetch();
   };
 
-  const loadNotifications = async ({ withLoading = true } = {}) => {
-    if (!hasAuthToken) {
-      setNotificationData({ unreadCount: 0, items: [] });
-      return;
-    }
-    if (withLoading) setNotificationLoading(true);
-    try {
-      const data = await listNotificationsApi();
-      setNotificationData(data);
-    } catch {
-      setNotificationData({ unreadCount: 0, items: [] });
-    } finally {
-      if (withLoading) setNotificationLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!hasAuthToken) return undefined;
-    loadNotifications({ withLoading: false });
-    const interval = window.setInterval(() => {
-      if (!notificationOpen) loadNotifications({ withLoading: false });
-    }, 5000);
-    return () => window.clearInterval(interval);
-  }, [hasAuthToken, notificationOpen]);
-
-  // Notifications refresh via the 5s polling effect above, which authenticates with the
+  // Notifications refresh via the RTK Query pollingInterval (5s), which authenticates with the
   // Authorization header (apiRequest). We intentionally do NOT use EventSource here: it cannot
   // send headers, which would force the JWT into the URL where it leaks into logs/history.
 
@@ -134,8 +120,11 @@ export default function Topbar({ onMenuClick }) {
                 className="text-xs text-blue-600 hover:text-blue-700 disabled:opacity-40"
                 disabled={!hasUnread}
                 onClick={async () => {
-                  await markAllNotificationsReadApi();
-                  await loadNotifications({ withLoading: false });
+                  try {
+                    await markAllRead().unwrap();
+                  } catch {
+                    // noop
+                  }
                 }}
               >
                 Mark all read
@@ -166,12 +155,7 @@ export default function Topbar({ onMenuClick }) {
                 onClick={async () => {
                   if (!item.read && hasAuthToken) {
                     try {
-                      await markNotificationReadApi(item.id);
-                      setNotificationData((prev) => {
-                        const items = prev.items.map((x) => (x.id === item.id ? { ...x, read: true } : x));
-                        const unreadCount = Math.max(0, items.filter((x) => !x.read).length);
-                        return { ...prev, items, unreadCount };
-                      });
+                      await markRead(item.id).unwrap();
                     } catch {
                       // noop
                     }

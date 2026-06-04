@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
+import { isLiveMode } from '../config/appMode';
+import { useGetInvoiceQuery } from '../store/apiSlice';
 import { formatCurrency } from '../utils/formatCurrency';
 import { formatMonthYear } from '../utils/formatDate';
 import { generateInvoiceNumber } from '../utils/generateInvoiceNumber';
 import societyConfig from '../config/society';
-import { getInvoiceApi } from '../services/invoiceService';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { ArrowLeft, Download, Printer } from 'lucide-react';
@@ -15,14 +15,10 @@ export default function InvoiceView() {
   const navigate = useNavigate();
   const { members, payments } = useData();
 
-  const [invoiceData, setInvoiceData] = useState(null);
+  // Live: fetch the server-built invoice via RTK Query. Demo: fall back to DataContext.
+  const { data: invoiceData } = useGetInvoiceQuery({ flatNumber, month }, { skip: !isLiveMode });
   const member = invoiceData?.member || members.find((m) => m.flatNumber === flatNumber);
   const payment = invoiceData?.payment || payments.find((p) => p.flatNumber === flatNumber && p.month === month);
-
-  useEffect(() => {
-    if (import.meta.env.VITE_APP_MODE !== 'live') return;
-    getInvoiceApi(flatNumber, month).then((data) => setInvoiceData(data)).catch(() => {});
-  }, [flatNumber, month]);
 
   const invoiceNumber = generateInvoiceNumber(flatNumber, month);
   const [year, mon] = month.split('-');

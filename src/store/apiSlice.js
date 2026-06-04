@@ -7,6 +7,12 @@ import * as governance from '../services/governanceService';
 import * as operations from '../services/operationsService';
 import * as finance from '../services/financeService';
 import * as product from '../services/productService';
+import * as members from '../services/memberService';
+import * as payments from '../services/paymentService';
+import * as expenses from '../services/expenseService';
+import * as portal from '../services/portalService';
+import * as notifications from '../services/notificationService';
+import * as invoice from '../services/invoiceService';
 
 // Wrap a service-function promise into RTK Query's { data } / { error } result shape.
 // The underlying services already handle live (HTTP) vs demo (in-memory) modes.
@@ -27,6 +33,8 @@ export const api = createApi({
     'Parking', 'Staff', 'Parcel', 'Document', 'EmergencyAlert',
     'Budget', 'Reconciliation', 'Compliance',
     'ProductSettings', 'Backup',
+    'Member', 'Payment', 'Expense',
+    'PortalSummary', 'PortalPayment', 'PortalComplaint', 'Notification', 'Invoice',
   ],
   endpoints: (builder) => ({
     // ---------- Complaints ----------
@@ -94,6 +102,39 @@ export const api = createApi({
     updateProductSettings: builder.mutation({ queryFn: (body) => run(product.updateProductSettingsApi(body)), invalidatesTags: ['ProductSettings'] }),
     getBackups: builder.query({ queryFn: () => run(product.listBackupsApi()), providesTags: ['Backup'] }),
     triggerBackup: builder.mutation({ queryFn: (body) => run(product.triggerBackupApi(body)), invalidatesTags: ['Backup'] }),
+
+    // ---------- Members ----------
+    getMembers: builder.query({ queryFn: () => run(members.listMembersApi()), providesTags: ['Member'] }),
+    createMember: builder.mutation({ queryFn: (body) => run(members.createMemberApi(body)), invalidatesTags: ['Member'] }),
+    createMemberLogin: builder.mutation({ queryFn: ({ id, password }) => run(members.createMemberLoginApi(id, password)), invalidatesTags: ['Member'] }),
+    updateMember: builder.mutation({ queryFn: ({ id, payload }) => run(members.updateMemberApi(id, payload)), invalidatesTags: ['Member'] }),
+    deleteMember: builder.mutation({ queryFn: (id) => run(members.deleteMemberApi(id)), invalidatesTags: ['Member'] }),
+
+    // ---------- Payments ----------
+    getPayments: builder.query({ queryFn: (month) => run(payments.listPaymentsApi(month)), providesTags: ['Payment'] }),
+    markPaymentPaid: builder.mutation({ queryFn: ({ id, payload }) => run(payments.markPaymentPaidApi(id, payload)), invalidatesTags: ['Payment'] }),
+
+    // ---------- Expenses ----------
+    getExpenses: builder.query({ queryFn: (month) => run(expenses.listExpensesApi(month)), providesTags: ['Expense'] }),
+    createExpense: builder.mutation({ queryFn: (body) => run(expenses.createExpenseApi(body)), invalidatesTags: ['Expense'] }),
+    deleteExpense: builder.mutation({ queryFn: (id) => run(expenses.deleteExpenseApi(id)), invalidatesTags: ['Expense'] }),
+
+    // ---------- Resident portal ----------
+    getMySummary: builder.query({ queryFn: (month) => run(portal.getMySummaryApi(month)), providesTags: ['PortalSummary'] }),
+    getMyPayments: builder.query({ queryFn: () => run(portal.getMyPaymentsApi()), providesTags: ['PortalPayment'] }),
+    getMyComplaints: builder.query({ queryFn: () => run(portal.getMyComplaintsApi()), providesTags: ['PortalComplaint'] }),
+    createMyComplaint: builder.mutation({ queryFn: (body) => run(portal.createMyComplaintApi(body)), invalidatesTags: ['PortalComplaint'] }),
+
+    // ---------- Notifications ----------
+    getNotifications: builder.query({ queryFn: () => run(notifications.listNotificationsApi()), providesTags: ['Notification'] }),
+    markNotificationRead: builder.mutation({ queryFn: (id) => run(notifications.markNotificationReadApi(id)), invalidatesTags: ['Notification'] }),
+    markAllNotificationsRead: builder.mutation({ queryFn: () => run(notifications.markAllNotificationsReadApi()), invalidatesTags: ['Notification'] }),
+
+    // ---------- Invoice ----------
+    getInvoice: builder.query({ queryFn: ({ flatNumber, month }) => run(invoice.getInvoiceApi(flatNumber, month)), providesTags: ['Invoice'] }),
+
+    // ---------- Device token (product) ----------
+    registerDeviceToken: builder.mutation({ queryFn: (body) => run(product.registerDeviceTokenApi(body)) }),
   }),
 });
 
@@ -122,4 +163,18 @@ export const {
   useGetComplianceSummaryQuery,
   // product
   useGetProductSettingsQuery, useUpdateProductSettingsMutation, useGetBackupsQuery, useTriggerBackupMutation,
+  // members
+  useGetMembersQuery, useCreateMemberMutation, useCreateMemberLoginMutation, useUpdateMemberMutation, useDeleteMemberMutation,
+  // payments
+  useGetPaymentsQuery, useMarkPaymentPaidMutation,
+  // expenses
+  useGetExpensesQuery, useCreateExpenseMutation, useDeleteExpenseMutation,
+  // resident portal
+  useGetMySummaryQuery, useGetMyPaymentsQuery, useGetMyComplaintsQuery, useCreateMyComplaintMutation,
+  // notifications
+  useGetNotificationsQuery, useMarkNotificationReadMutation, useMarkAllNotificationsReadMutation,
+  // invoice
+  useGetInvoiceQuery,
+  // device token
+  useRegisterDeviceTokenMutation,
 } = api;

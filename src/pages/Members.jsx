@@ -4,7 +4,7 @@ import Modal from '../components/common/Modal';
 import DataState from '../components/common/DataState';
 import { isValidEmail, isValidFlatNumber, isValidPhone } from '../utils/validation';
 import { isLiveMode } from '../config/appMode';
-import { createMemberLoginApi } from '../services/memberService';
+import { useCreateMemberLoginMutation } from '../store/apiSlice';
 import { Plus, Search, Users, Phone, Mail, Grid, List, Home, KeyRound, Eye, EyeOff } from 'lucide-react';
 
 const emptyForm = {
@@ -33,6 +33,7 @@ export default function Members() {
   const [loginBusy, setLoginBusy] = useState(false);
   const [showFormPassword, setShowFormPassword] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [createMemberLogin] = useCreateMemberLoginMutation();
 
   const openLoginModal = (m) => {
     setLoginTarget(m);
@@ -56,12 +57,12 @@ export default function Members() {
     setLoginBusy(true);
     setLoginError('');
     try {
-      const res = await createMemberLoginApi(loginTarget.id, loginPassword);
+      const res = await createMemberLogin({ id: loginTarget.id, password: loginPassword }).unwrap();
       setLoginSuccess(`Login ${res?.created ? 'created' : 'updated'} for ${res?.email || loginTarget.email}`);
       setLoginPassword('');
       reloadData?.(); // refresh hasLogin flags
     } catch (err) {
-      setLoginError(err?.message || 'Failed to save login');
+      setLoginError(err?.data?.message || 'Failed to save login');
     } finally {
       setLoginBusy(false);
     }

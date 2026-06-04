@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Home, Wallet, AlertCircle, CheckCircle2, Clock, Plus, MessageSquareWarning, Receipt,
 } from 'lucide-react';
@@ -11,8 +11,8 @@ import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import { useToast } from '../hooks/useToast';
 import {
-  getMySummaryApi, getMyPaymentsApi, getMyComplaintsApi, createMyComplaintApi,
-} from '../services/portalService';
+  useGetMySummaryQuery, useGetMyPaymentsQuery, useGetMyComplaintsQuery, useCreateMyComplaintMutation,
+} from '../store/apiSlice';
 
 const statusStyles = {
   paid: { label: 'Paid', color: 'bg-emerald-100 text-emerald-700', icon: CheckCircle2 },
@@ -55,37 +55,23 @@ export default function MyFlat() {
   const { members, payments } = useData();
   const { toast, showToast, clearToast } = useToast();
 
-  const [summary, setSummary] = useState(null);
-  const [myPayments, setMyPayments] = useState([]);
-  const [myComplaints, setMyComplaints] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ subject: '', category: '', priority: 'medium', description: '' });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      if (isLiveMode) {
-        const [s, p, c] = await Promise.all([getMySummaryApi(), getMyPaymentsApi(), getMyComplaintsApi()]);
-        setSummary(s);
-        setMyPayments(p);
-        setMyComplaints(c);
-      } else {
-        const view = deriveDemoView(members, payments);
-        setSummary(view.summary);
-        setMyPayments(view.payments);
-        setMyComplaints([]);
-      }
-    } catch (err) {
-      setError(err?.message || 'Failed to load your flat details');
-    } finally {
-      setLoading(false);
-    }
-  }, [members, payments]);
+  const live = isLiveMode;
+  const { data: summaryLive, isLoading: l1, error: e1 } = useGetMySummaryQuery(undefined, { skip: !live });
+  const { data: paymentsLive = [], isLoading: l2 } = useGetMyPaymentsQuery(undefined, { skip: !live });
+  const { data: complaintsLive = [], isLoading: l3 } = useGetMyComplaintsQuery(undefined, { skip: !live });
+  const [createMyComplaint] = useCreateMyComplaintMutation();
 
-  useEffect(() => { load(); }, [load]);
+  const demoView = useMemo(() => (live ? null : deriveDemoView(members, payments)), [live, members, payments]);
+  const [demoComplaints, setDemoComplaints] = useState([]);
+
+  const summary = live ? summaryLive : demoView?.summary;
+  const myPayments = live ? paymentsLive : (demoView?.payments || []);
+  const myComplaints = live ? complaintsLive : demoComplaints;
+  const loading = live ? (l1 || l2 || l3) : false;
+  const error = live ? (e1?.data?.message || '') : '';
 
   const cards = useMemo(() => {
     const due = summary?.currentDue;
@@ -114,15 +100,15 @@ export default function MyFlat() {
     ];
   }, [summary, myComplaints]);
 
-  const submitComplaint = (e) => {
+  const submitComplaint = async (e) => {
     e.preventDefault();
     const payload = { subject: form.subject, category: form.category, priority: form.priority, description: form.description };
     const reset = () => {
       setForm({ subject: '', category: '', priority: 'medium', description: '' });
       setShowModal(false);
     };
-    if (!isLiveMode) {
-      setMyComplaints((prev) => [
+    if (!live) {
+      setDemoComplaints((prev) => [
         { id: `demo-c-${Date.now()}`, ...payload, flat: summary?.flatNumber, status: 'open', date: getCurrentMonth() },
         ...prev,
       ]);
@@ -130,13 +116,14 @@ export default function MyFlat() {
       reset();
       return;
     }
-    createMyComplaintApi(payload)
-      .then((created) => {
-        setMyComplaints((prev) => [created, ...prev]);
-        showToast('success', 'Complaint raised');
-      })
-      .catch((err) => showToast('error', err.message || 'Failed to raise complaint'))
-      .finally(reset);
+    try {
+      await createMyComplaint(payload).unwrap();
+      showToast('success', 'Complaint raised');
+    } catch (err) {
+      showToast('error', err?.data?.message || 'Failed to raise complaint');
+    } finally {
+      reset();
+    }
   };
 
   if (loading) {

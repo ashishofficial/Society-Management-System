@@ -4,7 +4,7 @@
 // special-casing. State resets on page reload — that's the expected demo behaviour.
 
 import { getCurrentMonth } from '../utils/formatDate';
-import { demoExpenses, demoPayments } from '../data/demoData';
+import { demoMembers, demoExpenses, demoPayments } from '../data/demoData';
 
 const month = getCurrentMonth();
 const today = `${month}-15`;
@@ -17,6 +17,9 @@ let db = null;
 function ensureSeed() {
   if (db) return db;
   db = {
+    members: demoMembers.map((m) => ({ ...m, hasLogin: false })),
+    payments: demoPayments.map((p) => ({ ...p })),
+    expenses: demoExpenses.map((e) => ({ ...e })),
     notices: [
       { id: 'notice-1', title: 'Water Tank Cleaning', description: 'Water supply paused 11 AM–2 PM Sunday for tank cleaning.', category: 'maintenance', date: `${month}-07`, postedBy: 'RWA Admin', pinned: true },
       { id: 'notice-2', title: 'Yoga Session', description: 'Community hall yoga class every Saturday at 7 AM.', category: 'event', date: `${month}-10`, postedBy: 'RWA Admin', pinned: false },
