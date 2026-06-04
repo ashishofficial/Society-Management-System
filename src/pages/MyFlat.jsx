@@ -21,6 +21,13 @@ const statusStyles = {
   overdue: { label: 'Overdue', color: 'bg-red-100 text-red-700', icon: AlertCircle },
 };
 
+const complaintStatusStyles = {
+  open: { label: 'Open', color: 'bg-red-100 text-red-700' },
+  in_progress: { label: 'In Progress', color: 'bg-amber-100 text-amber-700' },
+  resolved: { label: 'Resolved', color: 'bg-emerald-100 text-emerald-700' },
+  closed: { label: 'Closed', color: 'bg-gray-100 text-gray-600' },
+};
+
 // In demo mode there is no authenticated flat link, so we treat the first resident as "me".
 function deriveDemoView(members, payments) {
   const me = members[0];
@@ -81,6 +88,8 @@ export default function MyFlat() {
         value: due ? formatCurrency(due.pendingAmount) : formatCurrency(0),
         sub: due ? statusStyles[due.status]?.label : 'No dues',
         icon: Wallet,
+        iconBg: 'bg-blue-50',
+        iconColor: 'text-blue-600',
         tone: due && due.pendingAmount > 0 ? 'text-red-600' : 'text-emerald-600',
       },
       {
@@ -88,6 +97,8 @@ export default function MyFlat() {
         value: formatCurrency(summary?.totalOutstanding || 0),
         sub: 'Across all months',
         icon: Receipt,
+        iconBg: 'bg-amber-50',
+        iconColor: 'text-amber-600',
         tone: (summary?.totalOutstanding || 0) > 0 ? 'text-amber-600' : 'text-emerald-600',
       },
       {
@@ -95,6 +106,8 @@ export default function MyFlat() {
         value: String(summary?.openComplaints ?? myComplaints.filter((c) => c.status === 'open' || c.status === 'in_progress').length),
         sub: 'Awaiting resolution',
         icon: MessageSquareWarning,
+        iconBg: 'bg-indigo-50',
+        iconColor: 'text-indigo-600',
         tone: 'text-gray-900',
       },
     ];
@@ -135,20 +148,35 @@ export default function MyFlat() {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Flat</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Welcome{user?.name ? `, ${user.name}` : ''} • Flat{' '}
-            <span className="font-semibold text-gray-700">{summary?.flatNumber || '-'}</span>
-          </p>
+      {/* Hero header */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <p className="text-blue-100 text-sm">Welcome back,</p>
+            <h1 className="text-2xl font-bold leading-tight">{user?.name || 'Resident'}</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-3 text-sm">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm">
+                <Home className="w-3.5 h-3.5" /> Flat {summary?.flatNumber || '-'}
+              </span>
+              {summary?.member?.isOwner !== undefined && (
+                <span className="px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm text-xs font-medium">
+                  {summary.member.isOwner ? 'Owner' : 'Tenant'}
+                </span>
+              )}
+              {summary?.member?.familyMembers != null && (
+                <span className="px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm text-xs font-medium">
+                  {summary.member.familyMembers} family members
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-blue-700 hover:bg-blue-50 text-sm font-semibold rounded-lg transition-colors shadow-sm self-start"
+          >
+            <Plus className="w-4 h-4" /> Raise Complaint
+          </button>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Raise Complaint
-        </button>
       </div>
 
       {/* Summary cards */}
@@ -156,12 +184,14 @@ export default function MyFlat() {
         {cards.map((c) => {
           const Icon = c.icon;
           return (
-            <div key={c.label} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-500 font-medium">{c.label}</p>
-                <Icon className="w-4 h-4 text-gray-300" />
+            <div key={c.label} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${c.iconBg}`}>
+                  <Icon className={`w-5 h-5 ${c.iconColor}`} />
+                </div>
+                <p className="text-sm text-gray-500 font-medium">{c.label}</p>
               </div>
-              <p className={`text-2xl font-bold mt-2 ${c.tone}`}>{c.value}</p>
+              <p className={`text-2xl font-bold mt-3 ${c.tone}`}>{c.value}</p>
               <p className="text-xs text-gray-400 mt-1">{c.sub}</p>
             </div>
           );
@@ -192,12 +222,16 @@ export default function MyFlat() {
           <h2 className="text-sm font-semibold text-gray-900">My Payment History</h2>
         </div>
         {myPayments.length === 0 ? (
-          <div className="px-5 py-8 text-center text-gray-400 text-sm">No payment records yet</div>
+          <div className="px-5 py-12 text-center">
+            <Receipt className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+            <p className="text-sm font-medium text-gray-500">No payment records yet</p>
+            <p className="text-xs text-gray-400 mt-1">Your maintenance bills will appear here.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                <tr className="text-left text-xs text-gray-400 uppercase tracking-wider bg-gray-50/60 border-b border-gray-100">
                   <th className="px-5 py-3 font-medium">Month</th>
                   <th className="px-5 py-3 font-medium">Due</th>
                   <th className="px-5 py-3 font-medium">Paid</th>
@@ -209,12 +243,12 @@ export default function MyFlat() {
                 {myPayments.map((p) => {
                   const st = statusStyles[p.status] || statusStyles.unpaid;
                   return (
-                    <tr key={p._id || p.id} className="border-b border-gray-50 last:border-0">
-                      <td className="px-5 py-3 font-medium text-gray-700">{formatMonthYear(p.month)}</td>
+                    <tr key={p._id || p.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
+                      <td className="px-5 py-3 font-medium text-gray-800">{formatMonthYear(p.month)}</td>
                       <td className="px-5 py-3 text-gray-600">{formatCurrency(p.totalDue)}</td>
                       <td className="px-5 py-3 text-gray-600">{formatCurrency(p.paidAmount)}</td>
                       <td className="px-5 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span>
+                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span>
                       </td>
                       <td className="px-5 py-3 text-gray-500">{p.paidDate ? formatDate(p.paidDate) : '-'}</td>
                     </tr>
@@ -232,21 +266,32 @@ export default function MyFlat() {
           <h2 className="text-sm font-semibold text-gray-900">My Complaints</h2>
         </div>
         {myComplaints.length === 0 ? (
-          <div className="px-5 py-8 text-center text-gray-400 text-sm">
-            <Home className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            No complaints raised yet
+          <div className="px-5 py-12 text-center">
+            <MessageSquareWarning className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+            <p className="text-sm font-medium text-gray-500">No complaints raised yet</p>
+            <p className="text-xs text-gray-400 mt-1">Use “Raise Complaint” to report an issue.</p>
           </div>
         ) : (
           <ul className="divide-y divide-gray-50">
-            {myComplaints.map((c) => (
-              <li key={c._id || c.id} className="px-5 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-gray-800">{c.subject}</p>
-                  <span className="text-xs text-gray-400 capitalize">{(c.status || 'open').replace('_', ' ')}</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{c.description}</p>
-              </li>
-            ))}
+            {myComplaints.map((c) => {
+              const cs = complaintStatusStyles[c.status] || complaintStatusStyles.open;
+              return (
+                <li key={c._id || c.id} className="px-5 py-4 hover:bg-gray-50/50 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">{c.subject}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{c.description}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-gray-400">
+                        {c.category && <span className="capitalize">{c.category}</span>}
+                        {c.priority && <span className="capitalize">• {c.priority} priority</span>}
+                        {c.date && <span>• {formatDate(c.date)}</span>}
+                      </div>
+                    </div>
+                    <span className={`inline-flex shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${cs.color}`}>{cs.label}</span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
