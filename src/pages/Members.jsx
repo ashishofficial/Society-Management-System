@@ -5,7 +5,7 @@ import DataState from '../components/common/DataState';
 import { isValidEmail, isValidFlatNumber, isValidPhone } from '../utils/validation';
 import { isLiveMode } from '../config/appMode';
 import { useCreateMemberLoginMutation } from '../store/apiSlice';
-import { Plus, Search, Users, Phone, Mail, Grid, List, Home, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Users, Phone, Mail, Grid, List, Home, KeyRound, Eye, EyeOff, Pencil } from 'lucide-react';
 
 const emptyForm = {
   flatNumber: '',
@@ -19,7 +19,7 @@ const emptyForm = {
   loginPassword: '',
 };
 export default function Members() {
-  const { members, addMember, isLoading, loadError, reloadData } = useData();
+  const { members, addMember, updateMember, isLoading, loadError, reloadData } = useData();
   const [search, setSearch] = useState('');
   const [blockFilter, setBlockFilter] = useState('All');
   const [viewMode, setViewMode] = useState('table');
@@ -34,6 +34,65 @@ export default function Members() {
   const [showFormPassword, setShowFormPassword] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [createMemberLogin] = useCreateMemberLoginMutation();
+  const [editTarget, setEditTarget] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [editError, setEditError] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+
+  const openEdit = (m) => {
+    setEditTarget(m);
+    setEditError('');
+    setEditForm({
+      name: m.name || '',
+      phone: m.phone || '',
+      email: m.email || '',
+      isOwner: m.isOwner,
+      familyMembers: m.familyMembers ?? 1,
+      status: m.status || 'active',
+    });
+  };
+
+  const closeEdit = () => {
+    setEditTarget(null);
+    setEditForm(null);
+    setEditError('');
+  };
+
+  const updateEditForm = (field, value) => setEditForm((prev) => ({ ...prev, [field]: value }));
+
+  const handleUpdateMember = async (e) => {
+    e.preventDefault();
+    if (!editTarget || !editForm) return;
+    if (!editForm.name.trim()) {
+      setEditError('Name is required');
+      return;
+    }
+    if (!isValidPhone(editForm.phone)) {
+      setEditError('Enter a valid 10-digit Indian phone number');
+      return;
+    }
+    if (editForm.email && !isValidEmail(editForm.email)) {
+      setEditError('Enter a valid email address');
+      return;
+    }
+    setEditBusy(true);
+    setEditError('');
+    try {
+      await updateMember(editTarget.id, {
+        name: editForm.name.trim(),
+        phone: editForm.phone,
+        email: editForm.email,
+        isOwner: editForm.isOwner,
+        familyMembers: Number(editForm.familyMembers || 1),
+        status: editForm.status,
+      });
+      closeEdit();
+    } catch (err) {
+      setEditError(err?.data?.message || 'Failed to update member');
+    } finally {
+      setEditBusy(false);
+    }
+  };
 
   const openLoginModal = (m) => {
     setLoginTarget(m);
@@ -199,7 +258,7 @@ export default function Members() {
                   <th className="px-4 py-3">Family Size</th>
                   <th className="px-4 py-3">Role</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Login</th>
+                  <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -249,12 +308,20 @@ export default function Members() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => openLoginModal(m)}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
-                      >
-                        <KeyRound className="w-3.5 h-3.5" /> {m.hasLogin ? 'Update login' : 'Create login'}
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => openEdit(m)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900"
+                        >
+                          <Pencil className="w-3.5 h-3.5" /> Edit
+                        </button>
+                        <button
+                          onClick={() => openLoginModal(m)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" /> {m.hasLogin ? 'Update login' : 'Create login'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -324,12 +391,20 @@ export default function Members() {
                   <span>{m.familyMembers} family members</span>
                 </div>
               </div>
-              <button
-                onClick={() => openLoginModal(m)}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800"
-              >
-                <KeyRound className="w-3.5 h-3.5" /> {m.hasLogin ? 'Update login' : 'Create login'}
-              </button>
+              <div className="mt-3 flex items-center gap-4">
+                <button
+                  onClick={() => openEdit(m)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900"
+                >
+                  <Pencil className="w-3.5 h-3.5" /> Edit
+                </button>
+                <button
+                  onClick={() => openLoginModal(m)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800"
+                >
+                  <KeyRound className="w-3.5 h-3.5" /> {m.hasLogin ? 'Update login' : 'Create login'}
+                </button>
+              </div>
             </div>
           ))}
           {filtered.length === 0 && (
@@ -586,6 +661,54 @@ export default function Members() {
                   ? (loginTarget?.hasLogin ? 'Updating…' : 'Creating…')
                   : (loginTarget?.hasLogin ? 'Update Login' : 'Create Login')}
               </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Edit Member Modal */}
+      <Modal isOpen={!!editTarget} onClose={closeEdit} title={`Edit ${editTarget?.flatNumber || 'Member'}`} size="lg">
+        {editForm && (
+          <form onSubmit={handleUpdateMember} className="space-y-4">
+            {editError && <p className="text-sm text-red-600">{editError}</p>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="edit-name" className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <input id="edit-name" type="text" value={editForm.name} onChange={(e) => updateEditForm('name', e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
+                <label htmlFor="edit-phone" className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input id="edit-phone" type="tel" value={editForm.phone} onChange={(e) => updateEditForm('phone', e.target.value)} placeholder="+91XXXXXXXXXX" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
+                <label htmlFor="edit-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input id="edit-email" type="email" value={editForm.email} onChange={(e) => updateEditForm('email', e.target.value)} placeholder="email@example.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
+                <label htmlFor="edit-family" className="block text-sm font-medium text-gray-700 mb-1">Family Members</label>
+                <input id="edit-family" type="number" min="1" max="20" value={editForm.familyMembers} onChange={(e) => updateEditForm('familyMembers', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Resident Type</label>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => updateEditForm('isOwner', true)} className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${editForm.isOwner ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>Owner</button>
+                <button type="button" onClick={() => updateEditForm('isOwner', false)} className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${!editForm.isOwner ? 'bg-yellow-500 text-white border-yellow-500' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>Tenant</button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => updateEditForm('status', 'active')} className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${editForm.status === 'active' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>Active</button>
+                <button type="button" onClick={() => updateEditForm('status', 'inactive')} className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${editForm.status === 'inactive' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>Inactive</button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={closeEdit} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
+              <button type="submit" disabled={editBusy} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-60">{editBusy ? 'Saving…' : 'Save Changes'}</button>
             </div>
           </form>
         )}
