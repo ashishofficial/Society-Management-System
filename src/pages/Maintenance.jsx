@@ -71,7 +71,8 @@ export default function Maintenance() {
   // Open mark-paid modal
   const openMarkPaid = (payment) => {
     setSelectedPayment(payment);
-    setPaymentAmount(payment.amount);
+    // Prefill the full amount owed (base + any late fee), not just the base maintenance.
+    setPaymentAmount(payment.totalDue ?? payment.amount);
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setPaymentMode('upi');
     setTransactionRef('');
@@ -222,8 +223,8 @@ export default function Maintenance() {
                       <p className="text-sm text-gray-600 truncate mb-1">{payment.memberName}</p>
                       <p className="text-sm font-medium text-gray-800">
                         {payment.status === 'partial'
-                          ? `${formatCurrency(payment.paidAmount)} / ${formatCurrency(payment.amount)}`
-                          : formatCurrency(payment.amount)}
+                          ? `${formatCurrency(payment.paidAmount)} / ${formatCurrency(payment.totalDue ?? payment.amount)}`
+                          : formatCurrency(payment.totalDue ?? payment.amount)}
                       </p>
 
                       {/* Bottom: action buttons (only if NOT paid) */}

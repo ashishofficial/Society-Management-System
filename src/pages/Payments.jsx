@@ -80,7 +80,8 @@ export default function Payments() {
     setMarkPaidTarget(payment);
     setMarkPaidError('');
     setPayForm({
-      amount: payment.amount,
+      // Prefill the full amount owed (includes late fees), not just the base maintenance.
+      amount: payment.totalDue ?? payment.amount,
       paidDate: new Date().toISOString().split('T')[0],
       paymentMode: 'upi',
       transactionRef: '',
@@ -89,7 +90,7 @@ export default function Payments() {
 
   const confirmMarkPaid = async () => {
     if (!markPaidTarget) return;
-    const amount = Number(payForm.amount || markPaidTarget.amount);
+    const amount = Number(payForm.amount || markPaidTarget.totalDue || markPaidTarget.amount);
     if (!isPositiveAmount(amount)) {
       setMarkPaidError('Paid amount should be greater than zero');
       return;
@@ -104,7 +105,7 @@ export default function Payments() {
       setMarkPaidTarget(null);
       setMarkPaidError('');
     } catch (error) {
-      setMarkPaidError(error?.message || 'Failed to mark payment');
+      setMarkPaidError(error?.data?.message || 'Failed to mark payment');
     }
   };
 
@@ -419,7 +420,7 @@ export default function Payments() {
                 {' '}&middot; {formatMonthYear(markPaidTarget.month)}
               </p>
               <p className="text-gray-500 mt-1">
-                Amount due: <span className="font-semibold text-gray-900">{formatCurrency(markPaidTarget.amount)}</span>
+                Amount due: <span className="font-semibold text-gray-900">{formatCurrency(markPaidTarget.totalDue ?? markPaidTarget.amount)}</span>
               </p>
             </div>
 

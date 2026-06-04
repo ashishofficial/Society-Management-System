@@ -175,9 +175,11 @@ export async function streamNotifications(req, res) {
     };
 
     await send();
+    // Poll for changes at a sane interval. 500ms ran ~12 DB queries/sec per connected client and
+    // saturated the Atlas/Render connection pool; 15s is plenty for notifications.
     const interval = setInterval(() => {
       send().catch(() => {});
-    }, 500);
+    }, 15000);
     const heartbeat = setInterval(() => {
       res.write(`event: ping\ndata: {}\n\n`);
     }, 25000);
